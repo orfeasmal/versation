@@ -1,0 +1,6 @@
+[submodule "deps/Ray4Laz"]
+	path = deps/Ray4Laz
+	url = https://github.com/GuvaCode/Ray4Laz
+[submodule "deps/ray4laz"]
+	path = deps/ray4laz
+	url = https://github.com/GuvaCode/ray4laz
