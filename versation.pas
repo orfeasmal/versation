@@ -14,7 +14,43 @@ type
 
 var
 	Width, Height: Integer;
-	Title: String;
+	Title: PChar;
+
+function CowCreate(X: Single; Y: Single): TEntity;
+const
+	COW_WIDTH = 100;
+	COW_HEIGHT = 50;
+	TEXTURE_PATH = 'assets/texture/cow.png';
+var
+	Cow: TEntity;
+	Image: TImage;
+begin
+	with Cow do
+	begin
+		Body.X := X;
+		Body.Y := Y;
+		Body.Width := COW_WIDTH;
+		Body.Height := COW_HEIGHT;
+
+		Velocity.X := 0;
+		Velocity.Y := 0;
+		Acceleration.X := 0;
+		Acceleration.Y := 0;
+
+		Color := GetColor($FFFFFFFF);
+
+		Image := LoadImage(TEXTURE_PATH);
+		Texture := LoadTextureFromImage(Image);
+		UnloadImage(Image);
+	end;
+
+	result := Cow;
+end;
+
+procedure CowDestroy(var Cow: TEntity);
+begin
+	UnloadTexture(Cow.Texture);
+end;
 
 procedure EntityUpdateGeneric(var E: TEntity; DTime: Double);
 begin
@@ -31,9 +67,14 @@ begin
 		end;
 end;
 
-procedure EntityRenderGeneric(const E: TEntity);
+procedure EntityRenderColor(const E: TEntity);
 begin
 	DrawRectangleRec(E.Body, E.Color);
+end;
+
+procedure EntityRenderTexture(const E: TEntity);
+begin
+	DrawTexture(E.Texture, 0, 0, E.Color);
 end;
 
 procedure AlienUpdate(var P: TEntity; DTime: Double);
@@ -73,12 +114,12 @@ begin
 			Height := 50;
 		end;
 
-		Velocity.X     := 0;
-		Velocity.Y     := 0;
+		Velocity.X := 0;
+		Velocity.Y := 0;
 		Acceleration.X := 0;
 		Acceleration.Y := 0;
 
-		Color := WHITE;
+		Color := GetColor($FFFFFFFF);
 	end;
 
 
@@ -86,7 +127,10 @@ begin
 	CowsSize := 16;
 	SetLength(Cows, CowsSize);
 
-	InitWindow(Width, Height, PChar(Title));
+	Cows[0] := CowCreate(0, 0);
+	CowsCount += 1;
+
+	InitWindow(Width, Height, Title);
 
 	while not WindowShouldClose() do
 	begin
@@ -102,13 +146,16 @@ begin
 		BeginDrawing();
 		ClearBackground(BackgroundColor);
 
-		EntityRenderGeneric(Alien);
+		EntityRenderColor(Alien);
 
 		for i := 0 to CowsCount - 1 do
-			EntityRenderGeneric(Cows[i]);
+			EntityRenderTexture(Cows[i]);
 
 		EndDrawing();
 	end;
+
+	for i := 0 to CowsCount - 1 do
+		CowDestroy(Cows[i]);
 
 	CloseWindow();
 end;
@@ -116,7 +163,7 @@ end;
 begin
 	Width  := 1280;
 	Height := 720;
-	Title  := 'Versation';
+	Title  := PChar('Versation');
 
 	Run();
 end.
