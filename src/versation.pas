@@ -9,11 +9,14 @@ type
 	TEntity = record
 		Body: TRectangle;
 		Velocity, Acceleration: TVector2;
-		Color: TColor;
 		Rotation: Single;
+		Color: TColor;
+
+		Gravity: Boolean;
 
 		Texture: TTexture2D;
 	end;
+	PEntity = ^TEntity;
 
 var
 	i, j: Int64;
@@ -25,25 +28,32 @@ var
 
 	CowTexture: TTexture2D;
 	// AlienTexture: TTexture2D;
+	// FarmerTexture: TTexture2D;
 
-	Alien: TEntity;
 	Cows: array of TEntity;
 	CowsCount: UInt64;
 	CowsSize: UInt64;
 
+{ ENTITY }
+
 procedure EntityUpdateGeneric(var E: TEntity);
+const
+	G = 500;
 begin
-		E.Velocity.X += E.Acceleration.X * DTime;
-		E.Velocity.Y += E.Acceleration.Y * DTime;
+	if E.Gravity then
+		E.Velocity.Y += G * DTime;
 
-		E.Body.X += E.Velocity.X * DTime;
-		E.Body.Y += E.Velocity.Y * DTime;
+	E.Velocity.X += E.Acceleration.X * DTime;
+	E.Velocity.Y += E.Acceleration.Y * DTime;
 
-		if (E.Body.Y + E.Body.Height) >= Height then
-		begin
-			E.Body.Y := Height - E.Body.Height;
-			E.Velocity.Y := 0;
-		end;
+	E.Body.X += E.Velocity.X * DTime;
+	E.Body.Y += E.Velocity.Y * DTime;
+
+	if E.Body.Y + E.Body.Height >= Height then
+	begin
+		E.Body.Y := Height - E.Body.Height;
+		E.Velocity.Y := 0.0;
+	end;
 end;
 
 procedure EntityRenderColor(const E: TEntity);
@@ -68,6 +78,8 @@ begin
 	DrawTexturePro(E.Texture, Source, E.Body, Origin, E.Rotation, E.Color);
 end;
 
+{ ALIEN }
+
 function AlienCreate(): TEntity;
 begin
 	with result do
@@ -76,16 +88,19 @@ begin
 		begin
 			X      := 0;
 			Y      := 0;
-			Width  := 50;
+			Width  := 100;
 			Height := 50;
 		end;
 
-		Velocity.X := 0;
-		Velocity.Y := 0;
-		Acceleration.X := 0;
-		Acceleration.Y := 0;
+		Velocity := Vector2Zero();
+		Acceleration := Vector2Zero();
+
+		Rotation := 0;
+
+		Gravity := false;
 
 		Color := GetColor($FFFFFFFF);
+		// Texture := AlienTexture;
 	end;
 end;
 
@@ -94,9 +109,9 @@ const
 	FRICTION = 1.0;
 	ACC = 1000.0;
 	VELX_MAX = 1000.0;
-	COW_ACC = 600.0;
+	COW_ACC = 400.0;
 var
-	Cow: TEntity;
+	Cow: PEntity;
 	AlienCowPosDifference: TVector2;
 begin
 	for i := 0 to CowsCount - 1 do
@@ -104,26 +119,28 @@ begin
 		if not IsKeyDown(KEY_SPACE) then
 			continue;
 
-		Cow := Cows[i];
+		Cow := @Cows[i];
 
-		if CheckCollisionRecs(A.Body, Cow.Body) then
+		if CheckCollisionRecs(A.Body, Cow^.Body) then
 		begin
 			// TODO: do something
 		end;
 
-		if (Cow.Body.X + Cow.Body.Width < A.Body.X) or
-			(Cow.Body.X > A.Body.X + A.Body.Width) or
-			(Cow.Body.Y < A.Body.Y + A.Body.Height) then
+		if (Cow^.Body.X + Cow^.Body.Width < A.Body.X) or
+			(Cow^.Body.X > A.Body.X + A.Body.Width) or
+			(Cow^.Body.Y < A.Body.Y + A.Body.Height) then
 			continue;
 
 		with AlienCowPosDifference do
 		begin
-			X := A.Body.X + (A.Body.Width / 2) - Cow.Body.X + (Cow.Body.Width / 2);
-			Y := A.Body.Y + (A.Body.Height / 2) - Cow.Body.Y + (Cow.Body.Height / 2);
+			X := (A.Body.X + (A.Body.Width / 2)) - (Cow^.Body.X + (Cow^.Body.Width / 2));
+			Y := (A.Body.Y + (A.Body.Height / 2)) - (Cow^.Body.Y + (Cow^.Body.Height / 2));
 		end;
 
-		Cow.Velocity := Vector2Add(
-			Cow.Velocity,
+		Cow^.Velocity.Y -= COW_ACC * DTime;
+
+		Cow^.Velocity := Vector2Add(
+			Cow^.Velocity,
 			Vector2Scale(
 				Vector2Normalize(AlienCowPosDifference),
 				COW_ACC * DTime
@@ -147,6 +164,34 @@ begin
 	A.Velocity := Vector2Scale(A.Velocity, 1 - FRICTION * DTime);
 end;
 
+{ FARMER }
+
+function FarmerCreate(X: Single; Y: Single): TEntity;
+const
+	FARMER_WIDTH = 25;
+	FARMER_HEIGHT = 75;
+begin
+	with result do
+	begin
+		Body.X := X;
+		Body.Y := Y;
+		Body.Width := FARMER_WIDTH;
+		Body.Height := FARMER_HEIGHT;
+
+		Velocity := Vector2Zero();
+		Acceleration := Vector2Zero();
+
+		Rotation := 0;
+		Gravity := true;
+
+		Color := GetColor($1133CCFF);
+
+		// Texture := FarmerTexture;
+	end;
+end;
+
+{ COW }
+
 function CowCreate(X: Single; Y: Single): TEntity;
 const
 	COW_WIDTH = 100;
@@ -159,12 +204,12 @@ begin
 		Body.Width := COW_WIDTH;
 		Body.Height := COW_HEIGHT;
 
-		Velocity.X := 0;
-		Velocity.Y := 0;
-		Acceleration.X := 0;
-		Acceleration.Y := 0;
+		Velocity := Vector2Zero();
+		Acceleration := Vector2Zero();
 
 		Rotation := 0.0;
+
+		Gravity := true;
 
 		Color := GetColor($FFFFFFFF);
 
@@ -173,8 +218,13 @@ begin
 end;
 
 const
+	COWS_AMOUNT = 100;
 	COW_TEXTURE_PATH = 'assets/textures/cow.png';
+var
+	Alien: TEntity;
 begin
+	Randomize;
+
 	Width  := 1280;
 	Height := 720;
 	Title  := PChar('Versation');
@@ -191,9 +241,15 @@ begin
 
 	CowTexture := LoadTexture(COW_TEXTURE_PATH);
 
-	for i := 0 to 1 - 1 do
+	for i := 0 to COWS_AMOUNT - 1 do
 	begin
-		Cows[i] := CowCreate(i * 50, i * 50);
+		if CowsCount = CowsSize then
+		begin
+			CowsSize *= 2;
+			SetLength(Cows, CowsSize);
+		end;
+
+		Cows[i] := CowCreate(Random(Width), Random(Height));
 		CowsCount += 1;
 	end;
 
@@ -205,7 +261,9 @@ begin
 		AlienUpdate(Alien);
 
 		for i := 0 to CowsCount - 1 do
+		begin
 			EntityUpdateGeneric(Cows[i]);
+		end;
 
 		{ REDNER }
 		BeginDrawing();
