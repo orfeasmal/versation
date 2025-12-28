@@ -5,7 +5,7 @@ interface
 type
 	KeyboardKey = (
 		KEY_NULL            := 0,
-		// Alphanumeric Keys
+		KEY_SPACE           := 32,
 		KEY_APOSTROPHE      := 39,
 		KEY_COMMA           := 44,
 		KEY_MINUS           := 45,
@@ -54,7 +54,6 @@ type
 		KEY_RIGHT_BRACKET   := 93,
 		KEY_GRAVE           := 96,
 		// Function keys
-		KEY_SPACE           := 32,
 		KEY_ESCAPE          := 256,
 		KEY_ENTER           := 257,
 		KEY_TAB             := 258,
@@ -86,16 +85,6 @@ type
 		KEY_F10             := 299,
 		KEY_F11             := 300,
 		KEY_F12             := 301,
-		KEY_LEFT_SHIFT      := 340,
-		KEY_LEFT_CONTROL    := 341,
-		KEY_LEFT_ALT        := 342,
-		KEY_LEFT_SUPER      := 343,
-		KEY_RIGHT_SHIFT     := 344,
-		KEY_RIGHT_CONTROL   := 345,
-		KEY_RIGHT_ALT       := 346,
-		KEY_RIGHT_SUPER     := 347,
-		KEY_KB_MENU         := 348,
-		// Keypad keys            ,
 		KEY_KP_0            := 320,
 		KEY_KP_1            := 321,
 		KEY_KP_2            := 322,
@@ -112,8 +101,18 @@ type
 		KEY_KP_SUBTRACT     := 333,
 		KEY_KP_ADD          := 334,
 		KEY_KP_ENTER        := 335,
-		KEY_KP_EQUAL        := 336
+		KEY_KP_EQUAL        := 336,
+		KEY_LEFT_SHIFT      := 340,
+		KEY_LEFT_CONTROL    := 341,
+		KEY_LEFT_ALT        := 342,
+		KEY_LEFT_SUPER      := 343,
+		KEY_RIGHT_SHIFT     := 344,
+		KEY_RIGHT_CONTROL   := 345,
+		KEY_RIGHT_ALT       := 346,
+		KEY_RIGHT_SUPER     := 347,
+		KEY_KB_MENU         := 348
 	);
+
 	MouseButton = (
 		MOUSE_BUTTON_LEFT,
 		MOUSE_BUTTON_RIGHT,
@@ -140,38 +139,44 @@ type
 
 	TImage = record
 		Data: Pointer;
-		Width, Height: NativeInt;
-		MipMaps, Format: NativeInt;
+		Width, Height: Integer;
+		MipMaps, Format: Integer;
 	end;
 
-	TTexture = record
+	TTexture2D = record
 		Id: UInt32;
-		Width, Height: NativeInt;
-		MipMaps, Format: NativeInt;
+		Width, Height: Integer;
+		MipMaps, Format: Integer;
 	end;
+	TTexture = TTexture2D;
 
 function  GetFrameTime(): Single; cdecl; external;
 function  GetTime(): Double; cdecl; external;
 
-procedure InitWindow(Width: NativeInt; Height: NativeInt; Title: PChar); cdecl; external;
+procedure InitWindow(Width: Integer; Height: Integer; Title: PChar); cdecl; external;
 procedure CloseWindow(); cdecl; external;
 function  WindowShouldClose(): Boolean; cdecl; external;
-
-function  IsKeyDown(Key: KeyboardKey): Boolean; cdecl; external;
-function  IsKeyPressed(Key: KeyboardKey): Boolean; cdecl; external;
 
 procedure BeginDrawing(); cdecl; external;
 procedure EndDrawing(); cdecl; external;
 procedure ClearBackground(Color: TColor); cdecl; external;
 procedure DrawRectangleRec(Rectangle: TRectangle; Color: TColor); cdecl; external;
-procedure DrawTexture(Texture: TTexture; X: NativeInt; Y: NativeInt; Color: TColor); cdecl; external;
+procedure DrawTexture(Texture: TTexture2D; X: Integer; Y: Integer; Tint: TColor); cdecl; external;
+procedure DrawTextureRec(Texture: TTexture2D; Source: TRectangle; Position: TVector2; Tint: TColor); cdecl; external;
+procedure DrawTexturePro(Texture: TTexture2D; Source: TRectangle; Dest: TRectangle; Origin: TVector2; Rotation: Single; Tint: TColor); cdecl; external;
+
+function  IsKeyDown(Key: KeyboardKey): Boolean; cdecl; external;
+function  IsKeyPressed(Key: KeyboardKey): Boolean; cdecl; external;
 
 function  LoadImage(FileName: PChar): TImage; cdecl; external;
 procedure UnloadImage(Image: TImage); cdecl; external;
-function  LoadTextureFromImage(Image: TImage): TTexture; cdecl; external;
-procedure UnloadTexture(Texture: TTexture); cdecl; external;
+function  LoadTextureFromImage(Image: TImage): TTexture2D; cdecl; external;
+function  LoadTexture(FileName: PChar): TTexture2D; cdecl; external;
+procedure UnloadTexture(Texture: TTexture2D); cdecl; external;
 
 function  GetColor(HexValue: UInt32): TColor; cdecl; external;
+
+function  CheckCollisionRecs(Rec1: TRectangle; Rec2: TRectangle): Boolean; cdecl; external;
 
 implementation
 
