@@ -3,7 +3,7 @@ unit Raylib;
 interface
 
 type
-	KeyboardKey = (
+	TKeyboardKey = (
 		KEY_NULL            := 0,
 		KEY_SPACE           := 32,
 		KEY_APOSTROPHE      := 39,
@@ -113,7 +113,7 @@ type
 		KEY_KB_MENU         := 348
 	);
 
-	MouseButton = (
+	TMouseButton = (
 		MOUSE_BUTTON_LEFT,
 		MOUSE_BUTTON_RIGHT,
 		MOUSE_BUTTON_MIDDLE,
@@ -150,23 +150,30 @@ type
 	end;
 	TTexture = TTexture2D;
 
-function  GetFrameTime(): Single; cdecl; external;
-function  GetTime(): Double; cdecl; external;
+function  GetFrameTime: Single; cdecl; external;
+function  GetTime: Double; cdecl; external;
+
+function  GetFPS: Integer; cdecl; external;
+procedure SetTargetFPS(FPS: Integer); cdecl; external;
+function  GetCurrentMonitor: Integer; cdecl; external;
+function  GetMonitorRefreshRate(Monitor: Integer): Integer; cdecl; external;
+procedure DrawFPS(X: Integer; Y: Integer); cdecl; external;
 
 procedure InitWindow(Width: Integer; Height: Integer; Title: PChar); cdecl; external;
-procedure CloseWindow(); cdecl; external;
-function  WindowShouldClose(): Boolean; cdecl; external;
+procedure CloseWindow; cdecl; external;
+function  WindowShouldClose: Boolean; cdecl; external;
 
-procedure BeginDrawing(); cdecl; external;
-procedure EndDrawing(); cdecl; external;
+procedure BeginDrawing; cdecl; external;
+procedure EndDrawing; cdecl; external;
 procedure ClearBackground(Color: TColor); cdecl; external;
 procedure DrawRectangleRec(Rectangle: TRectangle; Color: TColor); cdecl; external;
+procedure DrawRectanglePro(Rectangle: TRectangle; Origin: TVector2; Rotation: Single; Color: TColor); cdecl; external;
 procedure DrawTexture(Texture: TTexture2D; X: Integer; Y: Integer; Tint: TColor); cdecl; external;
 procedure DrawTextureRec(Texture: TTexture2D; Source: TRectangle; Position: TVector2; Tint: TColor); cdecl; external;
 procedure DrawTexturePro(Texture: TTexture2D; Source: TRectangle; Dest: TRectangle; Origin: TVector2; Rotation: Single; Tint: TColor); cdecl; external;
 
-function  IsKeyDown(Key: KeyboardKey): Boolean; cdecl; external;
-function  IsKeyPressed(Key: KeyboardKey): Boolean; cdecl; external;
+function  IsKeyDown(Key: TKeyboardKey): Boolean; cdecl; external;
+function  IsKeyPressed(Key: TKeyboardKey): Boolean; cdecl; external;
 
 function  LoadImage(FileName: PChar): TImage; cdecl; external;
 procedure UnloadImage(Image: TImage); cdecl; external;
