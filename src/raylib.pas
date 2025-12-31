@@ -1,8 +1,14 @@
+//{$mode FPC}
+
 unit Raylib;
 
 interface
 
 type
+	TConfigFlag = (
+		FLAG_MSAA_4X_HINT = $00000020
+	);
+
 	TKeyboardKey = (
 		KEY_NULL            := 0,
 		KEY_SPACE           := 32,
@@ -123,7 +129,6 @@ type
 		MOUSE_BUTTON_BACK
 	);
 
-type
 	TVector2 = record
 		X, Y: Single;
 	end;
@@ -132,6 +137,7 @@ type
 		X, Y: Single;
 		Width, Height: Single;
 	end;
+	PRectangle = ^TRectangle;
 
 	TColor = record
 		A, R, G, B: Byte;
@@ -150,6 +156,24 @@ type
 	end;
 	TTexture = TTexture2D;
 
+	TGlyphInfo = record
+		Value: Integer;
+		OffsetX, OffsetY: Integer;
+		AdvanceX: Integer;
+		Image: TImage;
+	end;
+	PGlyphInfo = ^TGlyphInfo;
+
+	TFont = record
+		BaseSize: Integer;
+		GlyghCount, GlyphPadding: Integer;
+		Texture: TTexture2D;
+		Rectangles: PRectangle;
+		GlyphInfo: PGlyphInfo;
+	end;
+
+procedure SetConfigFlags(Flags: TConfigFlag); cdecl; external;
+
 function  GetFrameTime: Single; cdecl; external;
 function  GetTime: Double; cdecl; external;
 
@@ -157,9 +181,9 @@ function  GetFPS: Integer; cdecl; external;
 procedure SetTargetFPS(FPS: Integer); cdecl; external;
 function  GetCurrentMonitor: Integer; cdecl; external;
 function  GetMonitorRefreshRate(Monitor: Integer): Integer; cdecl; external;
-procedure DrawFPS(X: Integer; Y: Integer); cdecl; external;
+procedure DrawFPS(X, Y: Integer); cdecl; external;
 
-procedure InitWindow(Width: Integer; Height: Integer; Title: PChar); cdecl; external;
+procedure InitWindow(Width, Height: Integer; Title: PChar); cdecl; external;
 procedure CloseWindow; cdecl; external;
 function  WindowShouldClose: Boolean; cdecl; external;
 
@@ -170,20 +194,27 @@ procedure DrawRectangleRec(Rectangle: TRectangle; Color: TColor); cdecl; externa
 procedure DrawRectanglePro(Rectangle: TRectangle; Origin: TVector2; Rotation: Single; Color: TColor); cdecl; external;
 procedure DrawTexture(Texture: TTexture2D; X: Integer; Y: Integer; Tint: TColor); cdecl; external;
 procedure DrawTextureRec(Texture: TTexture2D; Source: TRectangle; Position: TVector2; Tint: TColor); cdecl; external;
-procedure DrawTexturePro(Texture: TTexture2D; Source: TRectangle; Dest: TRectangle; Origin: TVector2; Rotation: Single; Tint: TColor); cdecl; external;
+procedure DrawTexturePro(Texture: TTexture2D; Source, Dest: TRectangle; Origin: TVector2; Rotation: Single; Tint: TColor); cdecl; external;
+procedure DrawText(Text: PChar; PosX, PosY, FontSize: Integer; Color: TColor); cdecl; external;
+procedure DrawTextEx(Font: TFont; Text: PChar; Position: TVector2; FontSize, Spacing: Single; Tint: TColor); cdecl; external;
 
 function  IsKeyDown(Key: TKeyboardKey): Boolean; cdecl; external;
 function  IsKeyPressed(Key: TKeyboardKey): Boolean; cdecl; external;
+function  IsMouseButtonDown(Button: TMouseButton): Boolean; cdecl; external;
+function  IsMouseButtonPressed(Button: TMouseButton): Boolean; cdecl; external;
 
 function  LoadImage(FileName: PChar): TImage; cdecl; external;
 procedure UnloadImage(Image: TImage); cdecl; external;
-function  LoadTextureFromImage(Image: TImage): TTexture2D; cdecl; external;
 function  LoadTexture(FileName: PChar): TTexture2D; cdecl; external;
+function  LoadTextureFromImage(Image: TImage): TTexture2D; cdecl; external;
 procedure UnloadTexture(Texture: TTexture2D); cdecl; external;
+function  LoadFont(FileName: PChar): TFont; cdecl; external;
+procedure UnloadFont(Font: TFont); cdecl; external;
+function  GetFontDefault: TFont; cdecl; external;
 
 function  GetColor(HexValue: UInt32): TColor; cdecl; external;
 
-function  CheckCollisionRecs(Rec1: TRectangle; Rec2: TRectangle): Boolean; cdecl; external;
+function  CheckCollisionRecs(Rec1, Rec2: TRectangle): Boolean; cdecl; external;
 
 implementation
 

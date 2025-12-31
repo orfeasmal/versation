@@ -1,33 +1,54 @@
+//{$mode FPC}
+
 program Versation;
 
 uses
 	Math,
+	SysUtils,
 	Raylib,
 	Raymath;
 
 type
-	PEntity = ^TEntity;
+	TEntityType = (
+		ENTITY_ALIEN,
+		ENTITY_COW,
+		ENTITY_FARMER,
+		ENTITY_GUN,
+		ENTITY_BULLET
+	);
+
 	TEntity = record
-		Origin: TVector2;
+		Id: UInt64;
+		EntityType: TEntityType;
+
+		RenderProcedure: procedure (const Entity: TEntity);
+
 		Body: TRectangle;
+		Origin: TVector2;
 		Velocity, Acceleration: TVector2;
 		Rotation: Single;
-		Gravity: Boolean;
 
 		Texture: TTexture2D;
 		Color: TColor;
+
+		Gravity: Boolean;
+
+		Score: Integer;
+		ScoreStr: AnsiString;
+		Timer: Single;
 
 		Bullets: Array of TEntity;
 		BulletsCount: UInt64;
 		BulletsSize: UInt64;
 	end;
+	PEntity = ^TEntity;
 
 var
 	i, j: Int64;
 	Width, Height: Integer;
 	Title: PChar;
-
 	BackgroundColor: TColor;
+
 	DTime: Double;
 
 	CowTexture: TTexture2D;
@@ -35,12 +56,15 @@ var
 	// FarmerTexture: TTexture2D;
 	// GunTexture: TTexture2D;
 
+	Font: TFont;
+
 { ENTITY }
 
 procedure EntityUpdateGeneric(var E: TEntity);
 const
 	G = 500;
 	FRICTION = 1.0;
+	BOUNCE_VELOCITY_LOSS = 0.7;
 begin
 	if E.Gravity then
 	begin
@@ -55,24 +79,24 @@ begin
 	E.Body.X += E.Velocity.X * DTime;
 	E.Body.Y += E.Velocity.Y * DTime;
 
-
 	if E.Body.Y + E.Body.Height >= Height then
 	begin
 		E.Body.Y := Height - E.Body.Height;
-		E.Velocity.Y := 0.0;
+		// E.Velocity.Y := 0.0;
+		E.Velocity.Y *= -1 * (1 - BOUNCE_VELOCITY_LOSS);
 
-		E.Velocity.X *= 1 - FRICTION * DTime;
+		E.Velocity.X *= 1 - (FRICTION * DTime);
 	end;
 
 	if E.Body.X <= 0 then
 	begin
 		E.Body.X := 0;
-		E.Velocity.X *= -1 * 0.50;
+		E.Velocity.X *= -1 * (1 - BOUNCE_VELOCITY_LOSS);
 	end
 	else if E.Body.X + E.Body.Width >= Width then
 	begin
 		E.Body.X := Width - E.Body.Width;
-		E.Velocity.X *= -1 * 0.50;
+		E.Velocity.X *= -1 * (1 - BOUNCE_VELOCITY_LOSS);
 	end;
 end;
 
@@ -84,6 +108,13 @@ end;
 procedure EntityRenderColorOrigin(const E: TEntity);
 begin
 	DrawRectanglePro(E.Body, E.Origin, E.Rotation, E.Color);
+end;
+
+procedure EntityRenderScore(const E: TEntity);
+const
+	Position: TVector2 = (X: 0; Y: 0);
+begin
+	DrawTextEx(Font, PChar(E.ScoreStr), Position, 32, 1.0, GetColor($FFFFFFFF));
 end;
 
 procedure EntityRenderTexture(const E: TEntity);
@@ -110,19 +141,24 @@ end;
 
 { ALIEN }
 
-function AlienCreate(X: Single; Y: Single): TEntity;
+function AlienCreate(X, Y: Single): TEntity;
 const
 	ALIEN_WIDTH = 100;
 	ALIEN_HEIGHT = 30;
 	ALIEN_COLOR = $99FF33FF;
 begin
-	result := Default(TEntity);
-	with result do
+	AlienCreate := Default(TEntity);
+	with AlienCreate do
 	begin
+		RenderProcedure := @EntityRenderColor;
+
+		EntityType := ENTITY_ALIEN;
 		Body.X := X;
 		Body.Y := Y;
 		Body.Width := ALIEN_WIDTH;
 		Body.Height := ALIEN_HEIGHT;
+
+		ScoreStr := 'Score: 0';
 
 		Color := GetColor(ALIEN_COLOR);
 		// Texture := AlienTexture;
@@ -138,17 +174,26 @@ var
 	Cow: PEntity;
 	AlienCowPosDifference: TVector2;
 begin
-	for i := 0 to CowsCount - 1 do
+	i := 0;
+	while i < CowsCount do
 	begin
-		if not IsKeyDown(KEY_SPACE) then
-			continue;
-
 		Cow := @CowsArray[i];
 
-		//if CheckCollisionRecs(A.Body, Cow^.Body) then
-		//begin
-			// TODO: do something
-		//end;
+		if CheckCollisionRecs(A.Body, Cow^.Body) then
+		begin
+			A.Score += 10;
+			A.ScoreStr := Format('Score: %d', [A.Score]);
+
+			Cow^ := CowsArray[CowsCount - 1];
+			CowsCount -= 1;
+
+			continue;
+		end;
+
+		i += 1;
+
+		if not IsKeyDown(KEY_SPACE) then
+			continue;
 
 		if (Cow^.Body.X + Cow^.Body.Width < A.Body.X) or
 			(Cow^.Body.X > A.Body.X + A.Body.Width) or
@@ -186,34 +231,48 @@ end;
 
 { FARMER }
 
-	{ Gun }
-
 function GunCreate(X, Y: Single): TEntity;
 const
-	GUN_WIDTH = 40;
+	GUN_WIDTH = 50;
 	GUN_HEIGHT = 10;
 	GUN_COLOR = $FFFFFFFF;
 begin
-	result := Default(TEntity);
+	GunCreate := Default(TEntity);
 
-	with result do
+	with GunCreate do
 	begin
+		EntityType := ENTITY_GUN;
+
+		Origin.Y := GUN_HEIGHT / 2;
 		Body.X := X;
 		Body.Y := Y;
 		Body.Width := GUN_WIDTH;
 		Body.Height := GUN_HEIGHT;
 
-		Origin.Y := GUN_HEIGHT / 2;
+		BulletsSize := 32;
+		SetLength(Bullets, BulletsSize);
 
 		Color := GetColor(GUN_COLOR);
 
 		// Texture := GunTexture;
+
+		RenderProcedure := @EntityRenderColorOrigin;
 	end;
+end;
+
+procedure GunShootBullet(var Gun: TEntity);
+begin
+	WriteLn('Bullet Shot');
 end;
 
 procedure GunUpdate(var Gun: TEntity);
 begin
-	// TODO: Implement
+	Gun.Timer += DTime;
+	if Gun.Timer >= 1 then
+	begin
+		Gun.Timer := 0;
+		GunShootBullet(Gun);
+	end;
 end;
 
 function FarmerCreate(X: Single): TEntity;
@@ -223,10 +282,11 @@ const
 	FARMER_COLOR = $1133CCFF;
 
 begin
-	result := Default(TEntity);
+	FarmerCreate := Default(TEntity);
 
-	with result do
+	with FarmerCreate do
 	begin
+		EntityType := ENTITY_FARMER;
 		Body.X := X;
 		Body.Y := Height - FARMER_HEIGHT;
 		Body.Width := FARMER_WIDTH;
@@ -237,6 +297,8 @@ begin
 		Color := GetColor(FARMER_COLOR);
 
 		// Texture := FarmerTexture;
+
+		RenderProcedure := @EntityRenderColor;
 	end;
 end;
 
@@ -258,11 +320,14 @@ end;
 
 function CowCreate(X: Single): TEntity;
 const
-	COW_WIDTH = 125;
+	COW_WIDTH = 115;
 begin
-	result := Default(TEntity);
-	with result do
+	CowCreate := Default(TEntity);
+	with CowCreate do
 	begin
+		RenderProcedure := @EntityRenderTexture;
+
+		EntityType := ENTITY_COW;
 		Body.Width := COW_WIDTH;
 		Body.Height := COW_WIDTH * (CowTexture.Height / CowTexture.Width);
 		Body.X := X;
@@ -274,9 +339,15 @@ begin
 	end;
 end;
 
+procedure CowUpdate(var Cow: TEntity; SelfIndexInArray: UInt64; var CowsArray: Array of TEntity; CowsCount: UInt64);
+begin
+	EntityUpdateGeneric(Cow);
+end;
+
 const
 	COW_TEXTURE_PATH = 'assets/textures/cow.png';
-	COWS_INITIAL_COUNT = 10;
+	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
+	COWS_INITIAL_COUNT = 1000;
 	ALIEN_Y = 10.0;
 var
 	RefreshRate: Integer;
@@ -292,7 +363,7 @@ begin
 
 	Width  := 1280;
 	Height := 720;
-	Title  := PChar('Versation');
+	Title  := 'Versation';
 
 	BackgroundColor := GetColor($000000FF);
 
@@ -312,9 +383,11 @@ begin
 	Gun := GunCreate(Random(Width), Random(Height));
 	Farmer := FarmerCreate(Gun.Body.X);
 
+	// SetConfigFlags(FLAG_MSAA_4X_HINT); // Anti-Aliasing
 	InitWindow(Width, Height, Title);
 
 	CowTexture := LoadTexture(COW_TEXTURE_PATH);
+	Font := LoadFont(FONT_PATH);
 
 	while CowsCount < COWS_INITIAL_COUNT do
 	begin
@@ -340,25 +413,29 @@ begin
 
 		for i := 0 to CowsCount - 1 do
 		begin
-			EntityUpdateGeneric(Cows[i]);
+			CowUpdate(Cows[i], i, Cows, CowsCount);
 		end;
 
 		{ REDNER }
 		BeginDrawing();
 		ClearBackground(BackgroundColor);
 
-		EntityRenderColor(Alien);
-		EntityRenderColor(Farmer);
-		EntityRenderColorOrigin(Gun);
+		Alien.RenderProcedure(Alien);
+		Farmer.RenderProcedure(Farmer);
+		Gun.RenderProcedure(Gun);
 
 		for i := 0 to CowsCount - 1 do
-			EntityRenderTexture(Cows[i]);
+			Cows[i].RenderProcedure(Cows[i]);
+
+		// HUD
+		EntityRenderScore(Alien);
 
 		// DrawFPS(0, 0);
 
 		EndDrawing();
 	end;
 
+	UnloadFont(Font);
 	UnloadTexture(CowTexture);
 
 	CloseWindow();
