@@ -1,4 +1,5 @@
 //{$mode FPC}
+{$H+}
 
 unit Raymath;
 

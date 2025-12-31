@@ -1,4 +1,5 @@
 //{$mode FPC}
+{$H+}
 
 program Versation;
 
@@ -32,6 +33,7 @@ type
 		Color: TColor;
 
 		Gravity: Boolean;
+		OnGround: Boolean;
 
 		Score: Integer;
 		ScoreStr: AnsiString;
@@ -81,12 +83,16 @@ begin
 
 	if E.Body.Y + E.Body.Height >= Height then
 	begin
+		E.OnGround := true;
+
 		E.Body.Y := Height - E.Body.Height;
 		// E.Velocity.Y := 0.0;
 		E.Velocity.Y *= -1 * (1 - BOUNCE_VELOCITY_LOSS);
 
 		E.Velocity.X *= 1 - (FRICTION * DTime);
-	end;
+	end
+	else
+		E.OnGround := false;
 
 	if E.Body.X <= 0 then
 	begin
@@ -262,7 +268,7 @@ end;
 
 procedure GunShootBullet(var Gun: TEntity);
 begin
-	WriteLn('Bullet Shot');
+	//WriteLn('Bullet Shot');
 end;
 
 procedure GunUpdate(var Gun: TEntity);
@@ -303,17 +309,25 @@ begin
 end;
 
 procedure FarmerUpdate(var F: TEntity; var Gun: TEntity; const Alien: TEntity);
+const
+	FARMER_VELOCITY_FACTOR = 1 / 6;
+	GUN_ANGLE_VELOCITY_FACTOR = 1 / 25;
 var
-	GunAngle: Single;
+	AlienGunAngle: Single;
+	AlienFarmerPosXDifference: Single;
 begin
 	EntityUpdateGeneric(F);
+
+	AlienFarmerPosXDifference := (Alien.Body.X + (Alien.Body.Width / 2)) - (F.Body.X + (F.Body.Width / 2));
+
+	F.Velocity.X := AlienFarmerPosXDifference * FARMER_VELOCITY_FACTOR;
 
 	Gun.Body.X := F.Body.X + F.Body.Width / 2;
 	Gun.Body.Y := F.Body.Y + F.Body.Height / 2;
 
-	GunAngle := FMod(ArcTan2(Alien.Body.Y - F.Body.Y, Alien.Body.X - F.Body.X), 2.0 * System.Pi);
-	GunAngle *= (180 / System.Pi);
-	Gun.Rotation := GunAngle;
+	AlienGunAngle := FMod(ArcTan2(Alien.Body.Y - F.Body.Y, Alien.Body.X - F.Body.X), 2.0 * System.Pi);
+	AlienGunAngle *= (180 / System.Pi);
+	Gun.Rotation += (AlienGunAngle - Gun.Rotation) * GUN_ANGLE_VELOCITY_FACTOR;
 end;
 
 { COW }
@@ -340,14 +354,24 @@ begin
 end;
 
 procedure CowUpdate(var Cow: TEntity; SelfIndexInArray: UInt64; var CowsArray: Array of TEntity; CowsCount: UInt64);
+const
+	COW_STEP_VEL = 100;
+	STEP_DELAY_SEC = 1.0;
 begin
+	Cow.Timer += DTime;
+	if Cow.OnGround and (Cow.Timer >= 1 + Random(100) / 10) then
+	begin
+		Cow.Timer := 0;
+		Cow.Velocity.X += COW_STEP_VEL * (-1 + Random(3));
+	end;
+
 	EntityUpdateGeneric(Cow);
 end;
 
 const
 	COW_TEXTURE_PATH = 'assets/textures/cow.png';
 	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
-	COWS_INITIAL_COUNT = 1000;
+	COWS_INITIAL_COUNT = 10;
 	ALIEN_Y = 10.0;
 var
 	RefreshRate: Integer;
@@ -386,8 +410,8 @@ begin
 	// SetConfigFlags(FLAG_MSAA_4X_HINT); // Anti-Aliasing
 	InitWindow(Width, Height, Title);
 
-	CowTexture := LoadTexture(COW_TEXTURE_PATH);
-	Font := LoadFont(FONT_PATH);
+	CowTexture := LoadTexture(PChar(AnsiString(COW_TEXTURE_PATH)));
+	Font := LoadFont(PChar(AnsiString(FONT_PATH)));
 
 	while CowsCount < COWS_INITIAL_COUNT do
 	begin
@@ -421,11 +445,12 @@ begin
 		ClearBackground(BackgroundColor);
 
 		Alien.RenderProcedure(Alien);
-		Farmer.RenderProcedure(Farmer);
-		Gun.RenderProcedure(Gun);
 
 		for i := 0 to CowsCount - 1 do
 			Cows[i].RenderProcedure(Cows[i]);
+
+		Farmer.RenderProcedure(Farmer);
+		Gun.RenderProcedure(Gun);
 
 		// HUD
 		EntityRenderScore(Alien);
