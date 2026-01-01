@@ -7,6 +7,7 @@ interface
 
 type
 	TConfigFlag = (
+		FLAG_VSYNC_HINT   = $00000040,
 		FLAG_MSAA_4X_HINT = $00000020
 	);
 
@@ -173,7 +174,8 @@ type
 		GlyphInfo: PGlyphInfo;
 	end;
 
-procedure SetConfigFlags(Flags: TConfigFlag); cdecl; external;
+//procedure SetConfigFlags(Flags: TConfigFlag); cdecl; external;
+procedure SetConfigFlags(Flags: Integer); cdecl; external;
 
 function  GetFrameTime: Single; cdecl; external;
 function  GetTime: Double; cdecl; external;
@@ -191,8 +193,11 @@ function  WindowShouldClose: Boolean; cdecl; external;
 procedure BeginDrawing; cdecl; external;
 procedure EndDrawing; cdecl; external;
 procedure ClearBackground(Color: TColor); cdecl; external;
+procedure DrawRectangle(X, Y, Width, Height: Integer; Color: TColor); cdecl; external;
 procedure DrawRectangleRec(Rectangle: TRectangle; Color: TColor); cdecl; external;
 procedure DrawRectanglePro(Rectangle: TRectangle; Origin: TVector2; Rotation: Single; Color: TColor); cdecl; external;
+procedure DrawRectangleLines(X, Y, Width, Height: Integer; Color: TColor); cdecl; external;
+procedure DrawRectangleLinesEx(Rectangle: TRectangle; LineThick: Single; Color: TColor); cdecl; external;
 procedure DrawTexture(Texture: TTexture2D; X: Integer; Y: Integer; Tint: TColor); cdecl; external;
 procedure DrawTextureRec(Texture: TTexture2D; Source: TRectangle; Position: TVector2; Tint: TColor); cdecl; external;
 procedure DrawTexturePro(Texture: TTexture2D; Source, Dest: TRectangle; Origin: TVector2; Rotation: Single; Tint: TColor); cdecl; external;
@@ -211,9 +216,10 @@ function  LoadTextureFromImage(Image: TImage): TTexture2D; cdecl; external;
 procedure UnloadTexture(Texture: TTexture2D); cdecl; external;
 function  LoadFont(FileName: PChar): TFont; cdecl; external;
 procedure UnloadFont(Font: TFont); cdecl; external;
-function  GetFontDefault: TFont; cdecl; external;
 
 function  GetColor(HexValue: UInt32): TColor; cdecl; external;
+function  GetFontDefault: TFont; cdecl; external;
+function  MeasureTextEx(Font: TFont; Text: PChar; FontSize, Spacing: Single): TVector2; cdecl; external;
 
 function  CheckCollisionRecs(Rec1, Rec2: TRectangle): Boolean; cdecl; external;
 

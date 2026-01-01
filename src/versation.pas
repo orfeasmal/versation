@@ -11,6 +11,7 @@ uses
 
 type
 	TEntityType = (
+		ENTITY_BACKGROUND,
 		ENTITY_ALIEN,
 		ENTITY_COW,
 		ENTITY_FARMER,
@@ -37,6 +38,8 @@ type
 
 		Score: Integer;
 		ScoreStr: AnsiString;
+		Health: Integer;
+
 		Timer: Single;
 
 		Bullets: Array of TEntity;
@@ -45,6 +48,9 @@ type
 	end;
 	PEntity = ^TEntity;
 
+const
+	HEALTH_MIN = 0;
+	HEALTH_MAX = 100;
 var
 	i, j: Int64;
 	Width, Height: Integer;
@@ -53,6 +59,7 @@ var
 
 	DTime: Double;
 
+	BackgroundTexture: TTexture2D;
 	CowTexture: TTexture2D;
 	// AlienTexture: TTexture2D;
 	// FarmerTexture: TTexture2D;
@@ -116,11 +123,43 @@ begin
 	DrawRectanglePro(E.Body, E.Origin, E.Rotation, E.Color);
 end;
 
-procedure EntityRenderScore(const E: TEntity);
+procedure RenderScore(ScoreStr: PChar);
 const
-	Position: TVector2 = (X: 0; Y: 0);
+	FONT_SIZE = 32;
+	FONT_SPACING = 1.0;
+var
+	Position: TVector2;
 begin
-	DrawTextEx(Font, PChar(E.ScoreStr), Position, 32, 1.0, GetColor($FFFFFFFF));
+	with Position do
+	begin
+		X := Width - MeasureTextEx(Font, ScoreStr, FONT_SIZE, FONT_SPACING).X;
+		Y := 0;
+	end;
+
+	DrawTextEx(Font, ScoreStr, Position, FONT_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
+end;
+
+procedure RenderHealth(Health: Integer);
+const
+	HEALTH_WIDTH = 200;
+	HEALTH_HEIGHT = 40;
+	HEALTH_BORDER_THICK = 2.0;
+	HEALTH_COLOR = $00FF00FF;
+var
+	Rectangle: TRectangle;
+begin
+	with Rectangle do
+	begin
+		X := 0;
+		Y := 0;
+		Width := HEALTH_WIDTH * (Health / HEALTH_MAX);
+		Height := HEALTH_HEIGHT;
+	end;
+
+	DrawRectangleRec(Rectangle, GetColor(HEALTH_COLOR));
+
+	Rectangle.Width *= (HEALTH_MAX / Health);
+	DrawRectangleLinesEx(Rectangle, HEALTH_BORDER_THICK, GetColor($000000FF));
 end;
 
 procedure EntityRenderTexture(const E: TEntity);
@@ -165,6 +204,7 @@ begin
 		Body.Height := ALIEN_HEIGHT;
 
 		ScoreStr := 'Score: 0';
+		Health := HEALTH_MAX;
 
 		Color := GetColor(ALIEN_COLOR);
 		// Texture := AlienTexture;
@@ -368,13 +408,28 @@ begin
 	EntityUpdateGeneric(Cow);
 end;
 
+function BackgroundCreate: TEntity;
+begin
+	BackgroundCreate := Default(TEntity);
+	with BackgroundCreate do
+	begin
+		Body.Width := Width;
+		Body.Height := Height;
+		Texture := BackgroundTexture;
+		Color := GetColor($FFFFFFFF);
+	end;
+end;
+
 const
+	BACKGROUND_TEXTURE_PATH = 'assets/textures/background.png';
 	COW_TEXTURE_PATH = 'assets/textures/cow.png';
 	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
+
 	COWS_INITIAL_COUNT = 10;
 	ALIEN_Y = 10.0;
 var
-	RefreshRate: Integer;
+	Background: TEntity;
+
 	Alien: TEntity;
 	Farmer: TEntity;
 	Gun: TEntity;
@@ -389,29 +444,22 @@ begin
 	Height := 720;
 	Title  := 'Versation';
 
-	BackgroundColor := GetColor($000000FF);
+	SetConfigFlags(Integer(FLAG_MSAA_4X_HINT) or Integer(FLAG_VSYNC_HINT)); // Anti-Aliasing
+	InitWindow(Width, Height, Title);
 
-	RefreshRate := GetMonitorRefreshRate(GetCurrentMonitor());
-	if RefreshRate > 0 then
-	begin
-		SetTargetFPS(RefreshRate);
-	end
-	else
-		SetTargetFPS(60);
+	BackgroundTexture := LoadTexture(BACKGROUND_TEXTURE_PATH);
+	CowTexture := LoadTexture(COW_TEXTURE_PATH);
+	Font := LoadFont(FONT_PATH);
 
-	CowsCount := 0;
-	CowsSize := 16;
-	SetLength(Cows, CowsSize);
+	Background := BackgroundCreate();
 
 	Alien := AlienCreate(Random(Width - 100), ALIEN_Y);
 	Gun := GunCreate(Random(Width), Random(Height));
 	Farmer := FarmerCreate(Gun.Body.X);
 
-	// SetConfigFlags(FLAG_MSAA_4X_HINT); // Anti-Aliasing
-	InitWindow(Width, Height, Title);
-
-	CowTexture := LoadTexture(PChar(AnsiString(COW_TEXTURE_PATH)));
-	Font := LoadFont(PChar(AnsiString(FONT_PATH)));
+	CowsCount := 0;
+	CowsSize := 16;
+	SetLength(Cows, CowsSize);
 
 	while CowsCount < COWS_INITIAL_COUNT do
 	begin
@@ -442,7 +490,7 @@ begin
 
 		{ REDNER }
 		BeginDrawing();
-		ClearBackground(BackgroundColor);
+		EntityRenderTexture(Background);
 
 		Alien.RenderProcedure(Alien);
 
@@ -453,7 +501,8 @@ begin
 		Gun.RenderProcedure(Gun);
 
 		// HUD
-		EntityRenderScore(Alien);
+		RenderHealth(Alien.Health);
+		RenderScore(PChar(Alien.ScoreStr));
 
 		// DrawFPS(0, 0);
 
@@ -462,6 +511,7 @@ begin
 
 	UnloadFont(Font);
 	UnloadTexture(CowTexture);
+	UnloadTexture(BackgroundTexture);
 
 	CloseWindow();
 end.
