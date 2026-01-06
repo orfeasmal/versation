@@ -12,6 +12,7 @@ function Vector2Add(V1, V2: TVector2): TVector2; cdecl; external;
 function Vector2Subtract(V1, V2: TVector2): TVector2; cdecl; external;
 function Vector2Scale(V: TVector2; Scale: Single): TVector2; cdecl; external;
 function Vector2Normalize(V: TVector2): TVector2; cdecl; external;
+function Vector2Rotate(V: TVector2; Angle: Single): TVector2; cdecl; external;
 
 implementation
 

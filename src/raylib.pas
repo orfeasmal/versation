@@ -7,8 +7,8 @@ interface
 
 type
 	TConfigFlag = (
-		FLAG_VSYNC_HINT   = $00000040,
-		FLAG_MSAA_4X_HINT = $00000020
+		FLAG_MSAA_4X_HINT = $00000020,
+		FLAG_VSYNC_HINT   = $00000040
 	);
 
 	TKeyboardKey = (
@@ -188,6 +188,7 @@ procedure DrawFPS(X, Y: Integer); cdecl; external;
 
 procedure InitWindow(Width, Height: Integer; Title: PChar); cdecl; external;
 procedure CloseWindow; cdecl; external;
+procedure SetWindowTitle(Title: PChar); cdecl; external;
 function  WindowShouldClose: Boolean; cdecl; external;
 
 procedure BeginDrawing; cdecl; external;
