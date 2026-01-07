@@ -19,9 +19,15 @@ type
 		ENTITY_BULLET
 	);
 
+	TEntityState = (
+		ENTITY_STATE_NORMAL,
+		ENTITY_STATE_BEING_SUCKED
+	);
+
 	TEntity = record
 		Id: UInt32;
 		EntityType: TEntityType;
+		State: TEntityState;
 
 		RenderProcedure: procedure (const Entity: TEntity);
 
@@ -282,97 +288,6 @@ begin
 	DrawTexturePro(E.Texture, Source, E.Body, Origin, E.Rotation, E.Color);
 end;
 
-{ ALIEN }
-
-function AlienCreate(X, Y: Single): TEntity;
-const
-	ALIEN_WIDTH = 100;
-	ALIEN_HEIGHT = 30;
-	ALIEN_COLOR = $99FF33FF;
-begin
-	AlienCreate := Default(TEntity);
-	with AlienCreate do
-	begin
-		RenderProcedure := @EntityRenderColor;
-
-		EntityType := ENTITY_ALIEN;
-		Body.X := X;
-		Body.Y := Y;
-		Body.Width := ALIEN_WIDTH;
-		Body.Height := ALIEN_HEIGHT;
-
-		ScoreStr := 'Score: 0';
-		Health := HEALTH_MAX;
-
-		Color := GetColor(ALIEN_COLOR);
-		// Texture := AlienTexture;
-	end;
-end;
-
-procedure AlienUpdate(var A: TEntity; var Cows: TEntityArray);
-const
-	ACC = 1000.0;
-	VELX_MAX = 1000.0;
-	COW_ACC = 600.0;
-var
-	Cow: PEntity;
-	AlienCowPosDifference: TVector2;
-begin
-	for i := 0 to Cows.Count - 1 do
-	begin
-		Cow := @Cows.Data[i];
-
-		if CheckCollisionRecs(A.Body, Cow^.Body) then
-		begin
-			A.Score += 10;
-			A.ScoreStr := Format('Score: %d', [A.Score]);
-
-			// EntityArrayMarkForRemoval(Cows, i);
-			// EntityArrayRemove(Cows, i);
-			Cow^.MarkedForRemoval := true;
-
-			continue;
-		end;
-
-		if not IsKeyDown(KEY_SPACE) then
-			continue;
-
-		if (Cow^.Body.X + Cow^.Body.Width < A.Body.X) or
-			(Cow^.Body.X > A.Body.X + A.Body.Width) or
-			(Cow^.Body.Y < A.Body.Y + A.Body.Height) then
-			continue;
-
-		with AlienCowPosDifference do
-		begin
-			X := (A.Body.X + (A.Body.Width / 2)) - (Cow^.Body.X + (Cow^.Body.Width / 2));
-			Y := (A.Body.Y + (A.Body.Height / 2)) - (Cow^.Body.Y + (Cow^.Body.Height / 2));
-		end;
-
-		Cow^.Velocity := Vector2Add(
-			Cow^.Velocity,
-			Vector2Scale(
-				Vector2Normalize(AlienCowPosDifference),
-				COW_ACC * DTime
-			)
-		);
-	end;
-
-	EntityArrayRemoveMarked(Cows);
-
-	if IsKeyDown(KEY_A) then
-		A.Velocity.X -= ACC * DTime;
-
-	if IsKeyDown(KEY_D) then
-		A.Velocity.X += ACC * DTime;
-
-	if Abs(A.Velocity.X) >= VELX_MAX then
-	begin
-		A.Velocity.X := Sign(A.Velocity.X) * VELX_MAX;
-	end;
-
-	EntityUpdateGeneric(A);
-end;
-
 { BULLET }
 
 function BulletCreate(X, Y: Single; StartVelocity: TVector2): TEntity;
@@ -441,7 +356,7 @@ begin
 	end;
 end;
 
-procedure GunUpdate(var G: TEntity; Bullets: TEntityArray; var Target: TEntity);
+procedure GunUpdate(var G: TEntity; Bullets: TEntityArray);
 var
 	Bullet: PEntity;
 begin
@@ -551,38 +466,134 @@ procedure CowUpdate(var Cow: TEntity; SelfIndexInArray: UInt64; var Cows: TEntit
 const
 	COW_STEP_VEL = 100;
 	STEP_DELAY_SEC = 1.0;
+	SUCKING_SPEED = 300;
+	SUCK_LOWER_SIZE_LIMIT = 25;
 var
-	Cow2: PEntity;
-	CowMaxDistanceNotIntersecting: Single;
+	SuckAmount: Single;
 begin
+	EntityUpdateGeneric(Cow);
+
+	if Cow.State = ENTITY_STATE_BEING_SUCKED then
+	begin
+		Cow.Velocity.Y := 0;
+
+		SuckAmount := SUCKING_SPEED * DTime;
+
+		Cow.Body.Height -= SuckAmount;
+		Cow.Body.Width  -= SuckAmount;
+
+		Cow.Body.X += SuckAmount / 2;
+
+		if Cow.Body.Width < SUCK_LOWER_SIZE_LIMIT then
+			Cow.MarkedForRemoval := true;
+
+		Exit;
+	end;
+
 	Cow.Timer += DTime;
 	if Cow.OnGround and (Cow.Timer >= 1 + Random(100) / 10) then
 	begin
 		Cow.Timer := 0;
 		Cow.Velocity.X += COW_STEP_VEL * (-1 + Random(3));
 	end;
+end;
 
-	{
-	i := SelfIndexInArray + 1;
-	while i < CowsCount do
+{ ALIEN }
+
+function AlienCreate(X, Y: Single): TEntity;
+const
+	ALIEN_WIDTH = 100;
+	ALIEN_HEIGHT = 30;
+	ALIEN_COLOR = $99FF33FF;
+begin
+	AlienCreate := Default(TEntity);
+	with AlienCreate do
 	begin
-		Cow2 := @CowsArray[i];
-		i += 1;
+		RenderProcedure := @EntityRenderColor;
 
-		if not CheckCollisionRecs(Cow.Body, Cow2^.Body) then
+		EntityType := ENTITY_ALIEN;
+		Body.X := X;
+		Body.Y := Y;
+		Body.Width := ALIEN_WIDTH;
+		Body.Height := ALIEN_HEIGHT;
+
+		ScoreStr := 'Score: 0';
+		Health := HEALTH_MAX;
+
+		Color := GetColor(ALIEN_COLOR);
+		// Texture := AlienTexture;
+	end;
+end;
+
+procedure AlienUpdate(var A: TEntity; var Cows: TEntityArray);
+const
+	ACC = 1000.0;
+	VELX_MAX = 1000.0;
+	COW_ACC = 600.0;
+var
+	Cow: PEntity;
+	AlienCowPosDifference: TVector2;
+begin
+	if A.Health = 0 then
+	begin
+		A.MarkedForRemoval := true;
+		Exit;
+	end;
+
+	for i := 0 to Cows.Count - 1 do
+	begin
+		Cow := @Cows.Data[i];
+
+		if CheckCollisionRecs(A.Body, Cow^.Body) then
+		begin
+			A.Score += 10;
+			A.ScoreStr := Format('Score: %d', [A.Score]);
+
+			// EntityArrayMarkForRemoval(Cows, i);
+			// EntityArrayRemove(Cows, i);
+			//Cow^.MarkedForRemoval := true;
+			Cow^.State := ENTITY_STATE_BEING_SUCKED;
+
+			continue;
+		end;
+
+		if not IsKeyDown(KEY_SPACE) then
 			continue;
 
-		CowMaxDistanceNotIntersecting := Cow.Body.Width + Cow2^.Body.Width;
+		if (Cow^.Body.X + Cow^.Body.Width < A.Body.X) or
+			(Cow^.Body.X > A.Body.X + A.Body.Width) or
+			(Cow^.Body.Y < A.Body.Y + A.Body.Height) then
+			continue;
 
-		Cow.Body.X += Sign(Cow.Velocity.X) * CowMaxDistanceNotIntersecting / 2;
-		Cow2^.Body.X += Sign(Cow2^.Velocity.X) * CowMaxDistanceNotIntersecting / 2;
+		with AlienCowPosDifference do
+		begin
+			X := (A.Body.X + (A.Body.Width / 2)) - (Cow^.Body.X + (Cow^.Body.Width / 2));
+			Y := (A.Body.Y + (A.Body.Height / 2)) - (Cow^.Body.Y + (Cow^.Body.Height / 2));
+		end;
 
-		Cow.Velocity.X *= -1;
-		Cow2^.Velocity.X *= -1;
+		Cow^.Velocity := Vector2Add(
+			Cow^.Velocity,
+			Vector2Scale(
+				Vector2Normalize(AlienCowPosDifference),
+				COW_ACC * DTime
+			)
+		);
 	end;
-	}
 
-	EntityUpdateGeneric(Cow);
+	EntityArrayRemoveMarked(Cows);
+
+	if IsKeyDown(KEY_A) then
+		A.Velocity.X -= ACC * DTime;
+
+	if IsKeyDown(KEY_D) then
+		A.Velocity.X += ACC * DTime;
+
+	if Abs(A.Velocity.X) >= VELX_MAX then
+	begin
+		A.Velocity.X := Sign(A.Velocity.X) * VELX_MAX;
+	end;
+
+	EntityUpdateGeneric(A);
 end;
 
 function BackgroundCreate: TEntity;
@@ -651,8 +662,11 @@ begin
 		DTime := GetFrameTime();
 
 		AlienUpdate(Alien, Cows);
+		if Alien.MarkedForRemoval then
+			break;
+
 		FarmerUpdate(Farmer, Gun, Bullets, Alien);
-		GunUpdate(Gun, Bullets, Alien);
+		GunUpdate(Gun, Bullets);
 		for i := 0 to Bullets.Count - 1 do
 			BulletUpdate(Bullets.Data[i], Alien);
 		EntityArrayRemoveMarked(Bullets);
