@@ -94,6 +94,44 @@ begin
 	end;
 end;
 
+procedure EntityArrayRemove(var Arr: TEntityArray; Index: UInt32);
+begin
+	with Arr do
+	begin
+		if Index > High(Data) then
+		begin
+			WriteLn('internal error: attempting to remove index of entity array that does not exist');
+			Exit;
+		end;
+
+		if Index <> Count - 1 then
+		begin
+			Data[Index] := Data[Count - 1];
+		end;
+
+		Count -= 1;
+	end;
+end;
+
+procedure EntityArrayRemoveMarked(var Arr: TEntityArray);
+begin
+	with Arr do
+	begin
+		i := 0;
+		while i < Count do
+		begin
+			if Data[i].MarkedForRemoval then
+			begin
+				Data[i] := Data[Count - 1];
+				Count -= 1;
+			end;
+			
+			i += 1;
+		end;
+	end;
+end;
+
+{
 procedure EntityArrayMarkForRemoval(var Arr: TEntityArray; Index: UInt32);
 begin
 	with Arr do
@@ -108,12 +146,15 @@ begin
 		MarkedCount += 1;
 	end;
 end;
+}
 
+{
 procedure EntityArrayRemoveMarked(var Arr: TEntityArray);
 begin
 	with Arr do
 	begin
-		for i := 0 to Arr.MarkedCount - 1 do
+		i := 0;
+		while i < Arr.MarkedCount do
 		begin
 			Data[MarkedForRemoval[i]] := Data[Count - 1];
 			Count -= 1;
@@ -122,6 +163,7 @@ begin
 		Arr.MarkedCount := 0;
 	end;
 end;
+}
 
 procedure EntityUpdateGeneric(var E: TEntity);
 const
@@ -200,7 +242,7 @@ const
 	HEALTH_WIDTH = 200;
 	HEALTH_HEIGHT = 40;
 	HEALTH_BORDER_THICK = 2.0;
-	HEALTH_COLOR = $00FF0099;
+	HEALTH_COLOR = $00FF00AA;
 var
 	Rectangle: TRectangle;
 begin
@@ -214,7 +256,7 @@ begin
 
 	DrawRectangleRec(Rectangle, GetColor(HEALTH_COLOR));
 
-	Rectangle.Width *= (HEALTH_MAX / Health);
+	Rectangle.Width := HEALTH_WIDTH;
 	DrawRectangleLinesEx(Rectangle, HEALTH_BORDER_THICK, GetColor($000000FF));
 end;
 
@@ -276,7 +318,7 @@ var
 	Cow: PEntity;
 	AlienCowPosDifference: TVector2;
 begin
-	for i := 0 to Cows.Count do
+	for i := 0 to Cows.Count - 1 do
 	begin
 		Cow := @Cows.Data[i];
 
@@ -285,7 +327,9 @@ begin
 			A.Score += 10;
 			A.ScoreStr := Format('Score: %d', [A.Score]);
 
-			EntityArrayMarkForRemoval(Cows, i);
+			// EntityArrayMarkForRemoval(Cows, i);
+			// EntityArrayRemove(Cows, i);
+			Cow^.MarkedForRemoval := true;
 
 			continue;
 		end;
@@ -352,12 +396,21 @@ begin
 	end;
 end;
 
-procedure BulletUpdate(var B: TEntity);
+procedure BulletUpdate(var B: TEntity; var Target: TEntity);
+const
+	BULLET_DAMAGE = HEALTH_MAX div 10;
 begin
+	EntityUpdateGeneric(B);
+
 	if B.Body.Y + B.Body.Height <= 0 then
 		B.MarkedForRemoval := true;
 
-	EntityUpdateGeneric(B);
+	if CheckCollisionRecs(B.Body, Target.Body) then
+	begin
+		B.MarkedForRemoval := true;
+		if Target.Health > 0 then
+			Target.Health -= BULLET_DAMAGE;
+	end;
 end;
 
 { GUN }
@@ -388,19 +441,10 @@ begin
 	end;
 end;
 
-procedure GunUpdate(var G: TEntity; Bullets: TEntityArray);
+procedure GunUpdate(var G: TEntity; Bullets: TEntityArray; var Target: TEntity);
 var
 	Bullet: PEntity;
 begin
-	for i := 0 to Bullets.Count - 1 do
-	begin
-		Bullet := @Bullets.Data[i];
-		BulletUpdate(Bullet^);
-
-		if Bullet^.MarkedForRemoval then
-			EntityArrayMarkForRemoval(Bullets, i);
-	end;
-	EntityArrayRemoveMarked(Bullets);
 end;
 
 procedure GunShootBullet(var G: TEntity; var Bullets: TEntityArray);
@@ -453,8 +497,8 @@ end;
 procedure FarmerUpdate(var F: TEntity; var Gun: TEntity; var Bullets: TEntityArray; const Alien: TEntity);
 const
 	FARMER_VELOCITY_FACTOR = 1 / 6;
-	GUN_ANGLE_VELOCITY_FACTOR = 1 / 25;
-	GUN_SHOOT_DELAY = 0.5;
+	GUN_ANGLE_VELOCITY_FACTOR = 1 / 10;
+	GUN_SHOOT_DELAY = 0.75;
 var
 	AlienGunAngle: Single;
 	AlienFarmerPosXDifference: Single;
@@ -608,7 +652,10 @@ begin
 
 		AlienUpdate(Alien, Cows);
 		FarmerUpdate(Farmer, Gun, Bullets, Alien);
-		GunUpdate(Gun, Bullets);
+		GunUpdate(Gun, Bullets, Alien);
+		for i := 0 to Bullets.Count - 1 do
+			BulletUpdate(Bullets.Data[i], Alien);
+		EntityArrayRemoveMarked(Bullets);
 
 		for i := 0 to Cows.Count - 1 do
 			CowUpdate(Cows.Data[i], i, Cows);
