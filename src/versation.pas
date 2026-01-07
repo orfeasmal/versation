@@ -490,6 +490,7 @@ begin
 		Exit;
 	end;
 
+	// Hard coding
 	Cow.Timer += DTime;
 	if Cow.OnGround and (Cow.Timer >= 1 + Random(100) / 10) then
 	begin
@@ -544,14 +545,14 @@ begin
 	begin
 		Cow := @Cows.Data[i];
 
+		if Cow^.State = ENTITY_STATE_BEING_SUCKED then
+			continue;
+
 		if CheckCollisionRecs(A.Body, Cow^.Body) then
 		begin
 			A.Score += 10;
 			A.ScoreStr := Format('Score: %d', [A.Score]);
 
-			// EntityArrayMarkForRemoval(Cows, i);
-			// EntityArrayRemove(Cows, i);
-			//Cow^.MarkedForRemoval := true;
 			Cow^.State := ENTITY_STATE_BEING_SUCKED;
 
 			continue;
@@ -637,7 +638,7 @@ begin
 	Title  := TITLE_RAW;
 	TitleFPSTimer := 1.0;
 
-	SetConfigFlags(Integer(FLAG_MSAA_4X_HINT) or Integer(FLAG_VSYNC_HINT)); // Anti-Aliasing
+	//SetConfigFlags(Integer(FLAG_MSAA_4X_HINT) or Integer(FLAG_VSYNC_HINT)); // Anti-Aliasing
 	InitWindow(Width, Height, PChar(Title));
 
 	BackgroundTexture := LoadTexture(BACKGROUND_TEXTURE_PATH);
