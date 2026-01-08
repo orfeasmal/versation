@@ -10,6 +10,11 @@ uses
 	Raymath;
 
 type
+	TGameState = (
+		GAME_STATE_PLAYING,
+		GAME_STATE_OVER
+	);
+
 	TEntityType = (
 		ENTITY_BACKGROUND,
 		ENTITY_ALIEN,
@@ -41,7 +46,7 @@ type
 		Timer: Single;
 
 		Health: Integer;
-		Score: Integer;
+		Score: UInt32;
 		ScoreStr: AnsiString;
 
 		OnGround, Gravity, MarkedForRemoval: Boolean;
@@ -73,7 +78,7 @@ var
 
 	Font: TFont;
 
-{ ENTITY }
+{ ENTITY ARRAY }
 
 function EntityArrayCreate(InitialSize: UInt32): TEntityArray;
 begin
@@ -170,6 +175,8 @@ begin
 	end;
 end;
 }
+
+{ ENTITY }
 
 procedure EntityUpdateGeneric(var E: TEntity);
 const
@@ -464,12 +471,13 @@ end;
 
 procedure CowUpdate(var Cow: TEntity; SelfIndexInArray: UInt64; var Cows: TEntityArray);
 const
-	COW_STEP_VEL = 100;
-	STEP_DELAY_SEC = 1.0;
 	SUCKING_SPEED = 300;
 	SUCK_LOWER_SIZE_LIMIT = 25;
+	COW_STEP_VEL = 100;
 var
 	SuckAmount: Single;
+	Cow2: PEntity;
+	Cow1Cow2PosDifference: TVector2;
 begin
 	EntityUpdateGeneric(Cow);
 
@@ -490,9 +498,21 @@ begin
 		Exit;
 	end;
 
-	// Hard coding
+	{
+	for i := SelfIndexInArray + 1 to Cows.Count - 1 do
+	begin
+		Cow2 := @Cows.Data[i];
+
+		with Cow1Cow2PosDifference do
+		begin
+			X := Cow.Body.X - Cow2^.Body.X;
+			Y := Cow.Body.Y - Cow2^.Body.Y;
+		end;
+	end;
+	}
+
 	Cow.Timer += DTime;
-	if Cow.OnGround and (Cow.Timer >= 1 + Random(100) / 10) then
+	if Cow.OnGround and (Cow.Timer >= 1 + Random(100) / 10) then // Random delay time
 	begin
 		Cow.Timer := 0;
 		Cow.Velocity.X += COW_STEP_VEL * (-1 + Random(3));
@@ -500,6 +520,39 @@ begin
 end;
 
 { ALIEN }
+
+procedure AlienRender(const Alien: TEntity);
+const
+	RAY_COLOR = $0000FF88;
+var
+	Vertex1, Vertex2, Vertex3: TVector2;
+begin
+	if IsKeyDown(KEY_SPACE) then
+	begin
+		with Vertex1 do
+		begin
+			X := Alien.Body.X + Alien.Body.Width / 2;
+			Y := Alien.Body.Y + Alien.Body.Height / 2;
+		end;
+
+		with Vertex2 do
+		begin
+			X := Vertex1.X - Alien.Body.Width;
+			Y := Height;
+		end;
+
+		with Vertex3 do
+		begin
+			X := Vertex1.X + Alien.Body.Width;
+			Y := Height;
+		end;
+
+		DrawTriangle(Vertex1, Vertex2, Vertex3, GetColor(RAY_COLOR));
+	end;
+
+	EntityRenderColor(Alien);
+end;
+
 
 function AlienCreate(X, Y: Single): TEntity;
 const
@@ -510,7 +563,7 @@ begin
 	AlienCreate := Default(TEntity);
 	with AlienCreate do
 	begin
-		RenderProcedure := @EntityRenderColor;
+		RenderProcedure := @AlienRender;
 
 		EntityType := ENTITY_ALIEN;
 		Body.X := X;
@@ -528,6 +581,7 @@ end;
 
 procedure AlienUpdate(var A: TEntity; var Cows: TEntityArray);
 const
+	SCORE_PER_COW = 100;
 	ACC = 1000.0;
 	VELX_MAX = 1000.0;
 	COW_ACC = 600.0;
@@ -550,7 +604,7 @@ begin
 
 		if CheckCollisionRecs(A.Body, Cow^.Body) then
 		begin
-			A.Score += 10;
+			A.Score += SCORE_PER_COW;
 			A.ScoreStr := Format('Score: %d', [A.Score]);
 
 			Cow^.State := ENTITY_STATE_BEING_SUCKED;
@@ -616,9 +670,11 @@ const
 	COW_TEXTURE_PATH = 'assets/textures/cow.png';
 	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
 
-	COWS_INITIAL_COUNT = 10;
+	COWS_INITIAL_COUNT = 100;
 	ALIEN_Y = 10.0;
 var
+	State: TGameState;
+
 	Title: AnsiString;
 	TitleFPSTimer: Single;
 
@@ -633,12 +689,14 @@ var
 begin
 	Randomize;
 
+	State := GAME_STATE_PLAYING;
+
 	Width  := 1280;
 	Height := 720;
 	Title  := TITLE_RAW;
 	TitleFPSTimer := 1.0;
 
-	//SetConfigFlags(Integer(FLAG_MSAA_4X_HINT) or Integer(FLAG_VSYNC_HINT)); // Anti-Aliasing
+	SetConfigFlags(Integer(FLAG_MSAA_4X_HINT) or Integer(FLAG_VSYNC_HINT)); // Anti-Aliasing
 	InitWindow(Width, Height, PChar(Title));
 
 	BackgroundTexture := LoadTexture(BACKGROUND_TEXTURE_PATH);
@@ -664,7 +722,7 @@ begin
 
 		AlienUpdate(Alien, Cows);
 		if Alien.MarkedForRemoval then
-			break;
+			State := GAME_STATE_OVER;
 
 		FarmerUpdate(Farmer, Gun, Bullets, Alien);
 		GunUpdate(Gun, Bullets);
@@ -687,10 +745,10 @@ begin
 		BeginDrawing();
 		EntityRenderTexture(Background);
 
-		Alien.RenderProcedure(Alien);
-
 		for i := 0 to Cows.Count - 1 do
 			Cows.Data[i].RenderProcedure(Cows.Data[i]);
+
+		Alien.RenderProcedure(Alien);
 
 		Farmer.RenderProcedure(Farmer);
 		for i := 0 to Bullets.Count - 1 do
