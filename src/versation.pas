@@ -12,6 +12,7 @@ uses
 type
 	TGameState = (
 		GAME_STATE_PLAYING,
+		GAME_STATE_SPAWNING_COWS,
 		GAME_STATE_OVER
 	);
 
@@ -357,7 +358,7 @@ end;
 
 procedure BulletUpdate(var B: TEntity; var Target: TEntity);
 const
-	BULLET_DAMAGE = HEALTH_MAX div 1;
+	BULLET_DAMAGE = HEALTH_MAX div 5;
 begin
 	EntityUpdateGeneric(B);
 
@@ -706,10 +707,15 @@ const
 	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
 
 	COWS_AMOUNT = 5;
+	COW_SPAWN_DELAY_INITIAL = 1.0;
+	COW_SPAWN_DELAY_DECREASE_FACTOR = 1.5;
 	ALIEN_Y = 10.0;
 var
 	State: TGameState;
 	Stage: Integer;
+
+	CowSpawnTimer: Single;
+	CowSpawnDelay: Single;
 
 	Title: AnsiString;
 	TitleFPSTimer: Single;
@@ -723,16 +729,14 @@ var
 
 	Cows: TEntityArray;
 
-procedure SpawnCows;
-begin
-	for i := 0 to  COWS_AMOUNT * Stage - 1 do
-		EntityArrayAdd(Cows, CowCreate(Random(Width)));
-end;
-
 begin
 	Randomize;
 
-	State := GAME_STATE_PLAYING;
+	State := GAME_STATE_SPAWNING_COWS;
+	Stage := 1;
+
+	CowSpawnTimer := 0;
+	CowSpawnDelay := COW_SPAWN_DELAY_INITIAL;
 
 	Width  := 1280;
 	Height := 720;
@@ -749,32 +753,72 @@ begin
 	Background := BackgroundCreate();
 
 	Alien := AlienCreate(Random(Width - 100), ALIEN_Y);
-	Gun := GunCreate(Random(Width), Random(Height));
-	Farmer := FarmerCreate(Gun.Body.X);
+	Farmer := FarmerCreate(Random(Width));
+	Gun := GunCreate(Farmer.Body.X + Farmer.Body.Width / 2, Farmer.Body.Y + Farmer.Body.Height / 2);
 	Bullets := EntityArrayCreate(16);
 
 	Cows := EntityArrayCreate(16);
-
-	SpawnCows();
 
 	while not WindowShouldClose() do
 	begin
 		DTime := GetFrameTime();
 
-		if State = GAME_STATE_PLAYING then
+		if State = GAME_STATE_OVER then
 		begin
-			{ UPDATE PLAYING }
+			{ UPDATE GAME OVER }
+			if IsKeyPressed(KEY_SPACE) then
+			begin
+				State := GAME_STATE_SPAWNING_COWS;
+				Stage := 1;
 
+				Alien.MarkedForRemoval := false;
+				Alien.Health := HEALTH_MAX;
+			end;
+
+			{ RENDER GAME OVER }
+			BeginDrawing();
+			ClearBackGround(GetColor($000000FF));
+
+			RenderGameOver;
+
+			EndDrawing();
+
+			continue;
+		end;
+
+		{ UPDATE PLAYING }
+
+		if State = GAME_STATE_SPAWNING_COWS then
+		begin
+			CowSpawnTimer += DTime;
+			if CowSpawnTimer > CowSpawnDelay then
+			begin
+				CowSpawnTimer := 0;
+				CowSpawnDelay /= COW_SPAWN_DELAY_DECREASE_FACTOR;
+
+				if Cows.Count > COWS_AMOUNT * Stage then
+				begin
+					State := GAME_STATE_PLAYING;
+				CowSpawnDelay := COW_SPAWN_DELAY_INITIAL;
+				end
+				else
+					EntityArrayAdd(Cows, CowCreate(Random(Width)));
+			end;
+		end
+		else if State = GAME_STATE_PLAYING then
+		begin
 			if Cows.Count = 0 then
 			begin
 				Stage += 1;
-				SpawnCows();
+				State := GAME_STATE_SPAWNING_COWS;
+				continue;
 			end;
 			
 			if Alien.MarkedForRemoval then
 			begin
 				State := GAME_STATE_OVER;
 				Cows.Count := 0;
+				Alien.Score := 0;
 				continue;
 			end;
 
@@ -788,58 +832,37 @@ begin
 
 			for i := 0 to Cows.Count - 1 do
 				CowUpdate(Cows.Data[i], i, Cows);
-
-			{ REDNER PLAYING }
-
-			TitleFPSTimer += DTime;
-			if TitleFPSTimer >= 1.0 then
-			begin
-				TitleFPSTimer := 0;
-				Title := Format('%s FPS: %d', [TITLE_RAW, GetFPS()]);
-				SetWindowTitle(PChar(Title));
-			end;
-
-			BeginDrawing();
-			EntityRenderTexture(Background);
-
-			for i := 0 to Cows.Count - 1 do
-				Cows.Data[i].RenderProcedure(Cows.Data[i]);
-
-			Alien.RenderProcedure(Alien);
-
-			Farmer.RenderProcedure(Farmer);
-			for i := 0 to Bullets.Count - 1 do
-				Bullets.Data[i].RenderProcedure(Bullets.Data[i]);
-			Gun.RenderProcedure(Gun);
-
-			// HUD
-			RenderHealth(Alien.Health);
-			RenderScore(Alien.Score);
-
-			EndDrawing();
-		end
-		else if State = GAME_STATE_OVER then
-		begin
-			{ UPDATE GAME OVER }
-			if IsKeyPressed(KEY_SPACE) then
-			begin
-				State := GAME_STATE_PLAYING;
-				Stage := 1;
-				Alien.MarkedForRemoval := false;
-				Alien.Health := HEALTH_MAX;
-				WriteLn('HDKFJ');
-				SpawnCows();
-
-			end;
-
-			{ RENDER GAME OVER }
-			BeginDrawing();
-			ClearBackGround(GetColor($000000FF));
-
-			RenderGameOver;
-
-			EndDrawing();
 		end;
+
+
+		{ REDNER PLAYING }
+
+		TitleFPSTimer += DTime;
+		if TitleFPSTimer >= 1.0 then
+		begin
+			TitleFPSTimer := 0;
+			Title := Format('%s FPS: %d', [TITLE_RAW, GetFPS()]);
+			SetWindowTitle(PChar(Title));
+		end;
+
+		BeginDrawing();
+		EntityRenderTexture(Background);
+
+		for i := 0 to Cows.Count - 1 do
+			Cows.Data[i].RenderProcedure(Cows.Data[i]);
+
+		Alien.RenderProcedure(Alien);
+
+		Farmer.RenderProcedure(Farmer);
+		for i := 0 to Bullets.Count - 1 do
+			Bullets.Data[i].RenderProcedure(Bullets.Data[i]);
+		Gun.RenderProcedure(Gun);
+
+		// HUD
+		RenderHealth(Alien.Health);
+		RenderScore(Alien.Score);
+
+		EndDrawing();
 	end;
 
 	UnloadFont(Font);
