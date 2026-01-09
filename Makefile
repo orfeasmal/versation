@@ -1,7 +1,7 @@
 PROJECT_NAME = versation
 
 PC = fpc
-CFLAGS     = -MOBJFPC deps/raylib-5.5_linux_amd64/lib/libraylib.a
+CFLAGS     = -MOBJFPC #Xrdeps/raylib-5.5_linux_amd64/lib/ -Xt
 CFLAGS_DEB = -O- -gw3
 CFLAGS_REL = -O3
 

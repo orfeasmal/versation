@@ -18,6 +18,6 @@ implementation
 
 {$linklib c}
 {$linklib m}
-{$linklib raylib}
+{$linklin raylib}
 
 end.

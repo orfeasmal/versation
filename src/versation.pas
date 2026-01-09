@@ -232,20 +232,57 @@ begin
 	DrawRectanglePro(E.Body, E.Origin, E.Rotation, E.Color);
 end;
 
-procedure RenderScore(ScoreStr: PChar);
+procedure RenderScore(Score: UInt32);
 const
 	FONT_SIZE = 32;
 	FONT_SPACING = 1.0;
 var
+	Str: AnsiString;
 	Position: TVector2;
 begin
+	Str := Format('Score: %d', [Score]);
+
 	with Position do
 	begin
-		X := Width - MeasureTextEx(Font, ScoreStr, FONT_SIZE, FONT_SPACING).X;
+		X := Width - MeasureTextEx(Font, PChar(Str), FONT_SIZE, FONT_SPACING).X;
 		Y := 0;
 	end;
 
-	DrawTextEx(Font, ScoreStr, Position, FONT_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
+	DrawTextEx(Font, PChar(Str), Position, FONT_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
+end;
+
+procedure RenderGameOver;
+const
+	FONT_SPACING = 1.0;
+
+	GAME_OVER_SIZE = 80;
+	GAME_OVER_STR = 'GAME OVER';
+	TRY_AGAIN_SIZE = 40;
+	TRY_AGAIN_STR = 'Press SPACE To Try Again';
+var
+	GameOverPosition: TVector2;
+	TryAgainPosition: TVector2;
+	GameOverDimensions: TVector2;
+	TryAgainDimensions: TVector2;
+begin
+	GameOverDimensions := Vector2Scale(MeasureTextEx(Font, GAME_OVER_STR, GAME_OVER_SIZE, FONT_SPACING), 1 / 2);
+	TryAgainDimensions := Vector2Scale(MeasureTextEx(Font, TRY_AGAIN_STR, TRY_AGAIN_SIZE, FONT_SPACING), 1 / 2);
+
+	with GameOverPosition do
+	begin
+		X := Width / 2 - GameOverDimensions.X;
+		Y := Height / 2 - (GameOverDimensions.Y + TryAgainDimensions.Y);
+	end;
+
+	DrawTextEx(Font, GAME_OVER_STR, GameOverPosition, GAME_OVER_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
+
+	with TryAgainPosition do
+	begin
+		X := Width / 2 - TryAgainDimensions.X;
+		Y := GameOverPosition.Y + GameOverDimensions.Y * 2;
+	end;
+
+	DrawTextEx(Font, TRY_AGAIN_STR, TryAgainPosition, TRY_AGAIN_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
 end;
 
 procedure RenderHealth(Health: Integer);
@@ -320,7 +357,7 @@ end;
 
 procedure BulletUpdate(var B: TEntity; var Target: TEntity);
 const
-	BULLET_DAMAGE = HEALTH_MAX div 10;
+	BULLET_DAMAGE = HEALTH_MAX div 1;
 begin
 	EntityUpdateGeneric(B);
 
@@ -571,7 +608,6 @@ begin
 		Body.Width := ALIEN_WIDTH;
 		Body.Height := ALIEN_HEIGHT;
 
-		ScoreStr := 'Score: 0';
 		Health := HEALTH_MAX;
 
 		Color := GetColor(ALIEN_COLOR);
@@ -605,7 +641,6 @@ begin
 		if CheckCollisionRecs(A.Body, Cow^.Body) then
 		begin
 			A.Score += SCORE_PER_COW;
-			A.ScoreStr := Format('Score: %d', [A.Score]);
 
 			Cow^.State := ENTITY_STATE_BEING_SUCKED;
 
@@ -670,10 +705,11 @@ const
 	COW_TEXTURE_PATH = 'assets/textures/cow.png';
 	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
 
-	COWS_INITIAL_COUNT = 100;
+	COWS_AMOUNT = 5;
 	ALIEN_Y = 10.0;
 var
 	State: TGameState;
+	Stage: Integer;
 
 	Title: AnsiString;
 	TitleFPSTimer: Single;
@@ -686,6 +722,13 @@ var
 	Bullets: TEntityArray;
 
 	Cows: TEntityArray;
+
+procedure SpawnCows;
+begin
+	for i := 0 to  COWS_AMOUNT * Stage - 1 do
+		EntityArrayAdd(Cows, CowCreate(Random(Width)));
+end;
+
 begin
 	Randomize;
 
@@ -712,56 +755,91 @@ begin
 
 	Cows := EntityArrayCreate(16);
 
-	for i := 0 to COWS_INITIAL_COUNT - 1 do
-		EntityArrayAdd(Cows, CowCreate(Random(Width)));
+	SpawnCows();
 
 	while not WindowShouldClose() do
 	begin
-		{ UPDATE }
 		DTime := GetFrameTime();
 
-		AlienUpdate(Alien, Cows);
-		if Alien.MarkedForRemoval then
-			State := GAME_STATE_OVER;
-
-		FarmerUpdate(Farmer, Gun, Bullets, Alien);
-		GunUpdate(Gun, Bullets);
-		for i := 0 to Bullets.Count - 1 do
-			BulletUpdate(Bullets.Data[i], Alien);
-		EntityArrayRemoveMarked(Bullets);
-
-		for i := 0 to Cows.Count - 1 do
-			CowUpdate(Cows.Data[i], i, Cows);
-
-		{ REDNER }
-		TitleFPSTimer += DTime;
-		if TitleFPSTimer >= 1.0 then
+		if State = GAME_STATE_PLAYING then
 		begin
-			TitleFPSTimer := 0;
-			Title := Format('%s FPS: %d', [TITLE_RAW, GetFPS()]);
-			SetWindowTitle(PChar(Title));
+			{ UPDATE PLAYING }
+
+			if Cows.Count = 0 then
+			begin
+				Stage += 1;
+				SpawnCows();
+			end;
+			
+			if Alien.MarkedForRemoval then
+			begin
+				State := GAME_STATE_OVER;
+				Cows.Count := 0;
+				continue;
+			end;
+
+			AlienUpdate(Alien, Cows);
+
+			FarmerUpdate(Farmer, Gun, Bullets, Alien);
+			GunUpdate(Gun, Bullets);
+			for i := 0 to Bullets.Count - 1 do
+				BulletUpdate(Bullets.Data[i], Alien);
+			EntityArrayRemoveMarked(Bullets);
+
+			for i := 0 to Cows.Count - 1 do
+				CowUpdate(Cows.Data[i], i, Cows);
+
+			{ REDNER PLAYING }
+
+			TitleFPSTimer += DTime;
+			if TitleFPSTimer >= 1.0 then
+			begin
+				TitleFPSTimer := 0;
+				Title := Format('%s FPS: %d', [TITLE_RAW, GetFPS()]);
+				SetWindowTitle(PChar(Title));
+			end;
+
+			BeginDrawing();
+			EntityRenderTexture(Background);
+
+			for i := 0 to Cows.Count - 1 do
+				Cows.Data[i].RenderProcedure(Cows.Data[i]);
+
+			Alien.RenderProcedure(Alien);
+
+			Farmer.RenderProcedure(Farmer);
+			for i := 0 to Bullets.Count - 1 do
+				Bullets.Data[i].RenderProcedure(Bullets.Data[i]);
+			Gun.RenderProcedure(Gun);
+
+			// HUD
+			RenderHealth(Alien.Health);
+			RenderScore(Alien.Score);
+
+			EndDrawing();
+		end
+		else if State = GAME_STATE_OVER then
+		begin
+			{ UPDATE GAME OVER }
+			if IsKeyPressed(KEY_SPACE) then
+			begin
+				State := GAME_STATE_PLAYING;
+				Stage := 1;
+				Alien.MarkedForRemoval := false;
+				Alien.Health := HEALTH_MAX;
+				WriteLn('HDKFJ');
+				SpawnCows();
+
+			end;
+
+			{ RENDER GAME OVER }
+			BeginDrawing();
+			ClearBackGround(GetColor($000000FF));
+
+			RenderGameOver;
+
+			EndDrawing();
 		end;
-
-		BeginDrawing();
-		EntityRenderTexture(Background);
-
-		for i := 0 to Cows.Count - 1 do
-			Cows.Data[i].RenderProcedure(Cows.Data[i]);
-
-		Alien.RenderProcedure(Alien);
-
-		Farmer.RenderProcedure(Farmer);
-		for i := 0 to Bullets.Count - 1 do
-			Bullets.Data[i].RenderProcedure(Bullets.Data[i]);
-		Gun.RenderProcedure(Gun);
-
-		// HUD
-		RenderHealth(Alien.Health);
-		RenderScore(PChar(Alien.ScoreStr));
-
-		// DrawFPS(0, 0);
-
-		EndDrawing();
 	end;
 
 	UnloadFont(Font);
