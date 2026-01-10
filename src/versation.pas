@@ -71,6 +71,7 @@ var
 
 	DTime: Double;
 
+	GameOverSound,
 	GunshotSound,
 	BulletHitSound,
 	CowSpawnSound,
@@ -723,19 +724,26 @@ end;
 const
 	TITLE_RAW = 'Versation';
 
-	BACKGROUND_TEXTURE_PATH   = 'assets/textures/background.png';
-	COW_TEXTURE_PATH          = 'assets/textures/cow.png';
+	BACKGROUND_TEXTURE_PATH = 'assets/textures/background.png';
+	COW_TEXTURE_PATH        = 'assets/textures/cow.png';
 
-	GUNSHOT_SOUND_PATH        = 'assets/audio/gunshot.wav';
-	BULLET_HIT_SOUND_PATH     = 'assets/audio/bullet_hit.wav';
-	COW_SPAWN_SOUND_PATH      = 'assets/audio/cow_spawn.wav';
-	COW_CAPTURE_SOUND_PATH    = 'assets/audio/cow_capture.wav';
+	GAME_OVER_SOUND_PATH   = 'assets/audio/game_over.wav';
+	GUNSHOT_SOUND_PATH     = 'assets/audio/gunshot.wav';
+	BULLET_HIT_SOUND_PATH  = 'assets/audio/bullet_hit.wav';
+	COW_SPAWN_SOUND_PATH   = 'assets/audio/cow_spawn.wav';
+	COW_CAPTURE_SOUND_PATH = 'assets/audio/cow_capture.wav';
 
-	FONT_PATH                 = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
+	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
+
+	GAME_OVER_SOUND_VOLUME   = 1.0;
+	GUNSHOT_SOUND_VOLUME     = 1.0;
+	BULLET_HIT_SOUND_VOLUME  = 0.8;
+	COW_SPAWN_SOUND_VOLUMNE  = 0.8;
+	COW_CAPTURE_SOUND_VOLUME = 0.4;
 
 	COWS_AMOUNT = 5;
-	COW_SPAWN_DELAY_INITIAL = 1.0;
-	COW_SPAWN_DELAY_DECREASE_FACTOR = 1.5;
+	COW_SPAWN_DELAY_INITIAL = 0.5;
+	COW_SPAWN_DELAY_DECREASE_FACTOR = 1.2;
 	ALIEN_Y = 10.0;
 var
 	State: TGameState;
@@ -778,10 +786,17 @@ begin
 	CowTexture := LoadTexture(COW_TEXTURE_PATH);
 	Font := LoadFont(FONT_PATH);
 
-	GunshotSound     := LoadSound(GUNSHOT_SOUND_PATH);
-	BulletHitSound   := LoadSound(BULLET_HIT_SOUND_PATH);
-	CowSpawnSound    := LoadSound(COW_SPAWN_SOUND_PATH);
-	CowCaptureSound  := LoadSound(COW_CAPTURE_SOUND_PATH);
+	GameOverSound         := LoadSound(GAME_OVER_SOUND_PATH);
+	GunshotSound          := LoadSound(GUNSHOT_SOUND_PATH);
+	BulletHitSound        := LoadSound(BULLET_HIT_SOUND_PATH);
+	CowSpawnSound         := LoadSound(COW_SPAWN_SOUND_PATH);
+	CowCaptureSound       := LoadSound(COW_CAPTURE_SOUND_PATH);
+
+	SetSoundVolume(GameOverSound,        GAME_OVER_SOUND_VOLUME);
+	SetSoundVolume(GunshotSound,         GUNSHOT_SOUND_VOLUME);
+	SetSoundVolume(BulletHitSound,       BULLET_HIT_SOUND_VOLUME);
+	SetSoundVolume(CowSpawnSound,        COW_SPAWN_SOUND_VOLUMNE);
+	SetSoundVolume(CowCaptureSound,      COW_CAPTURE_SOUND_VOLUME);
 
 	Background := BackgroundCreate();
 
@@ -856,6 +871,8 @@ begin
 			begin
 				State := GAME_STATE_OVER;
 				Cows.Count := 0;
+				PlaySound(GameOverSound);
+
 				continue;
 			end;
 

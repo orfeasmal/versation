@@ -242,6 +242,7 @@ procedure UnloadTexture(Texture: TTexture2D); cdecl; external;
 
 function  LoadSound(FileName: PChar): TSound; cdecl; external;
 procedure UnloadSound(Sound: TSound); cdecl; external;
+procedure SetSoundVolume(Sound: TSound; Volume: Single); cdecl; external;
 procedure PlaySound(Sound: TSound); cdecl; external;
 
 function  LoadFont(FileName: PChar): TFont; cdecl; external;
