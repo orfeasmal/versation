@@ -145,6 +145,26 @@ type
 		A, R, G, B: Byte;
 	end;
 
+	TrAudioBuffer = record
+	end;
+	PrAudioBuffer = ^TrAudioBuffer;
+
+	TrAudioProcessor = record
+	end;
+	PrAudioProcessor = ^TrAudioProcessor;
+
+	TAudioStream = record
+		Buffer: PrAudioBuffer;
+		Processor: PrAudioProcessor;
+
+		SampleRate, SampleSize, Channels: UInt32;
+	end;
+
+	TSound = record
+		Stream: TAudioStream;
+		FrameCount: UInt32;
+	end;
+
 	TImage = record
 		Data: Pointer;
 		Width, Height: Integer;
@@ -191,6 +211,9 @@ procedure CloseWindow; cdecl; external;
 procedure SetWindowTitle(Title: PChar); cdecl; external;
 function  WindowShouldClose: Boolean; cdecl; external;
 
+procedure InitAudioDevice; cdecl; external;
+procedure CloseAudioDevice; cdecl; external;
+
 procedure BeginDrawing; cdecl; external;
 procedure EndDrawing; cdecl; external;
 procedure ClearBackground(Color: TColor); cdecl; external;
@@ -216,6 +239,11 @@ procedure UnloadImage(Image: TImage); cdecl; external;
 function  LoadTexture(FileName: PChar): TTexture2D; cdecl; external;
 function  LoadTextureFromImage(Image: TImage): TTexture2D; cdecl; external;
 procedure UnloadTexture(Texture: TTexture2D); cdecl; external;
+
+function  LoadSound(FileName: PChar): TSound; cdecl; external;
+procedure UnloadSound(Sound: TSound); cdecl; external;
+procedure PlaySound(Sound: TSound); cdecl; external;
+
 function  LoadFont(FileName: PChar): TFont; cdecl; external;
 procedure UnloadFont(Font: TFont); cdecl; external;
 

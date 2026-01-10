@@ -71,6 +71,11 @@ var
 
 	DTime: Double;
 
+	GunshotSound,
+	BulletHitSound,
+	CowSpawnSound,
+	CowCaptureSound: TSound;
+
 	BackgroundTexture: TTexture2D;
 	CowTexture: TTexture2D;
 	// AlienTexture: TTexture2D;
@@ -233,56 +238,64 @@ begin
 	DrawRectanglePro(E.Body, E.Origin, E.Rotation, E.Color);
 end;
 
-procedure RenderScore(Score: UInt32);
+procedure RenderScore(ScoreStr: PChar);
 const
 	FONT_SIZE = 32;
 	FONT_SPACING = 1.0;
 var
-	Str: AnsiString;
 	Position: TVector2;
 begin
-	Str := Format('Score: %d', [Score]);
-
 	with Position do
 	begin
-		X := Width - MeasureTextEx(Font, PChar(Str), FONT_SIZE, FONT_SPACING).X;
+		X := Width - MeasureTextEx(Font, ScoreStr, FONT_SIZE, FONT_SPACING).X;
 		Y := 0;
 	end;
 
-	DrawTextEx(Font, PChar(Str), Position, FONT_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
+	DrawTextEx(Font, ScoreStr, Position, FONT_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
 end;
 
-procedure RenderGameOver;
+procedure RenderGameOver(ScoreStr: PChar);
 const
 	FONT_SPACING = 1.0;
 
 	GAME_OVER_SIZE = 80;
 	GAME_OVER_STR = 'GAME OVER';
+	SCORE_SIZE = 60;
 	TRY_AGAIN_SIZE = 40;
 	TRY_AGAIN_STR = 'Press SPACE To Try Again';
 var
 	GameOverPosition: TVector2;
+	ScorePosition: TVector2;
 	TryAgainPosition: TVector2;
+
 	GameOverDimensions: TVector2;
+	ScoreDimensions: TVector2;
 	TryAgainDimensions: TVector2;
 begin
 	GameOverDimensions := Vector2Scale(MeasureTextEx(Font, GAME_OVER_STR, GAME_OVER_SIZE, FONT_SPACING), 1 / 2);
+	ScoreDimensions    := Vector2Scale(MeasureTextEx(Font, ScoreStr,      SCORE_SIZE,     FONT_SPACING), 1 / 2);
 	TryAgainDimensions := Vector2Scale(MeasureTextEx(Font, TRY_AGAIN_STR, TRY_AGAIN_SIZE, FONT_SPACING), 1 / 2);
 
 	with GameOverPosition do
 	begin
 		X := Width / 2 - GameOverDimensions.X;
-		Y := Height / 2 - (GameOverDimensions.Y + TryAgainDimensions.Y);
+		Y := Height / 2 - (GameOverDimensions.Y + ScoreDimensions.Y + TryAgainDimensions.Y);
 	end;
 
 	DrawTextEx(Font, GAME_OVER_STR, GameOverPosition, GAME_OVER_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
 
+	with ScorePosition do
+	begin
+		X := Width / 2 - ScoreDimensions.X;
+		Y := GameOverPosition.Y + GameOverDimensions.Y * 2;
+	end;
+	DrawTextEx(Font, ScoreStr, ScorePosition, SCORE_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
+
 	with TryAgainPosition do
 	begin
 		X := Width / 2 - TryAgainDimensions.X;
-		Y := GameOverPosition.Y + GameOverDimensions.Y * 2;
+		Y := ScorePosition.Y + ScoreDimensions.Y * 2;
 	end;
-
 	DrawTextEx(Font, TRY_AGAIN_STR, TryAgainPosition, TRY_AGAIN_SIZE, FONT_SPACING, GetColor($FFFFFFFF));
 end;
 
@@ -292,8 +305,8 @@ const
 	HEALTH_Y = 5;
 	HEALTH_WIDTH = 200;
 	HEALTH_HEIGHT = 40;
-	HEALTH_BORDER_THICK = 2.0;
 	HEALTH_COLOR = $00FF00AA;
+	HEALTH_BACKGROUND_COLOR = $000000AA;
 var
 	Rectangle: TRectangle;
 begin
@@ -301,14 +314,14 @@ begin
 	begin
 		X := HEALTH_X;
 		Y := HEALTH_Y;
-		Width := HEALTH_WIDTH * (Health / HEALTH_MAX);
+		Width := HEALTH_WIDTH;
 		Height := HEALTH_HEIGHT;
 	end;
 
-	DrawRectangleRec(Rectangle, GetColor(HEALTH_COLOR));
+	DrawRectangleRec(Rectangle, GetColor(HEALTH_BACKGROUND_COLOR));
 
-	Rectangle.Width := HEALTH_WIDTH;
-	DrawRectangleLinesEx(Rectangle, HEALTH_BORDER_THICK, GetColor($000000FF));
+	Rectangle.Width := HEALTH_WIDTH * (Health / HEALTH_MAX);
+	DrawRectangleRec(Rectangle, GetColor(HEALTH_COLOR));
 end;
 
 procedure EntityRenderTexture(const E: TEntity);
@@ -358,7 +371,7 @@ end;
 
 procedure BulletUpdate(var B: TEntity; var Target: TEntity);
 const
-	BULLET_DAMAGE = HEALTH_MAX div 5;
+	BULLET_DAMAGE = HEALTH_MAX div 10;
 begin
 	EntityUpdateGeneric(B);
 
@@ -370,6 +383,8 @@ begin
 		B.MarkedForRemoval := true;
 		if Target.Health > 0 then
 			Target.Health -= BULLET_DAMAGE;
+
+		PlaySound(BulletHitSound);
 	end;
 end;
 
@@ -423,6 +438,8 @@ begin
 		)
 	);
 	EntityArrayAdd(Bullets, Bullet);
+
+	PlaySound(GunshotSound);
 end;
 
 { FARMER }
@@ -458,7 +475,7 @@ procedure FarmerUpdate(var F: TEntity; var Gun: TEntity; var Bullets: TEntityArr
 const
 	FARMER_VELOCITY_FACTOR = 1 / 6;
 	GUN_ANGLE_VELOCITY_FACTOR = 1 / 10;
-	GUN_SHOOT_DELAY = 0.75;
+	GUN_SHOOT_DELAY = 1.0;
 var
 	AlienGunAngle: Single;
 	AlienFarmerPosXDifference: Single;
@@ -610,6 +627,7 @@ begin
 		Body.Height := ALIEN_HEIGHT;
 
 		Health := HEALTH_MAX;
+		ScoreStr := 'Score: 0';
 
 		Color := GetColor(ALIEN_COLOR);
 		// Texture := AlienTexture;
@@ -642,8 +660,11 @@ begin
 		if CheckCollisionRecs(A.Body, Cow^.Body) then
 		begin
 			A.Score += SCORE_PER_COW;
+			A.ScoreStr := Format('Score: %d', [A.Score]);
 
 			Cow^.State := ENTITY_STATE_BEING_SUCKED;
+
+			PlaySound(CowCaptureSound);
 
 			continue;
 		end;
@@ -702,9 +723,15 @@ end;
 const
 	TITLE_RAW = 'Versation';
 
-	BACKGROUND_TEXTURE_PATH = 'assets/textures/background.png';
-	COW_TEXTURE_PATH = 'assets/textures/cow.png';
-	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
+	BACKGROUND_TEXTURE_PATH   = 'assets/textures/background.png';
+	COW_TEXTURE_PATH          = 'assets/textures/cow.png';
+
+	GUNSHOT_SOUND_PATH        = 'assets/audio/gunshot.wav';
+	BULLET_HIT_SOUND_PATH     = 'assets/audio/bullet_hit.wav';
+	COW_SPAWN_SOUND_PATH      = 'assets/audio/cow_spawn.wav';
+	COW_CAPTURE_SOUND_PATH    = 'assets/audio/cow_capture.wav';
+
+	FONT_PATH                 = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
 
 	COWS_AMOUNT = 5;
 	COW_SPAWN_DELAY_INITIAL = 1.0;
@@ -745,10 +772,16 @@ begin
 
 	SetConfigFlags(Integer(FLAG_MSAA_4X_HINT) or Integer(FLAG_VSYNC_HINT)); // Anti-Aliasing
 	InitWindow(Width, Height, PChar(Title));
+	InitAudioDevice();
 
 	BackgroundTexture := LoadTexture(BACKGROUND_TEXTURE_PATH);
 	CowTexture := LoadTexture(COW_TEXTURE_PATH);
 	Font := LoadFont(FONT_PATH);
+
+	GunshotSound     := LoadSound(GUNSHOT_SOUND_PATH);
+	BulletHitSound   := LoadSound(BULLET_HIT_SOUND_PATH);
+	CowSpawnSound    := LoadSound(COW_SPAWN_SOUND_PATH);
+	CowCaptureSound  := LoadSound(COW_CAPTURE_SOUND_PATH);
 
 	Background := BackgroundCreate();
 
@@ -773,13 +806,15 @@ begin
 
 				Alien.MarkedForRemoval := false;
 				Alien.Health := HEALTH_MAX;
+				Alien.Score := 0;
+				Alien.ScoreStr := 'Score: 0';
 			end;
 
 			{ RENDER GAME OVER }
 			BeginDrawing();
 			ClearBackGround(GetColor($000000FF));
 
-			RenderGameOver;
+			RenderGameOver(PChar(Alien.ScoreStr));
 
 			EndDrawing();
 
@@ -802,7 +837,10 @@ begin
 				CowSpawnDelay := COW_SPAWN_DELAY_INITIAL;
 				end
 				else
+				begin
 					EntityArrayAdd(Cows, CowCreate(Random(Width)));
+					PlaySound(CowSpawnSound);
+				end;
 			end;
 		end
 		else if State = GAME_STATE_PLAYING then
@@ -818,7 +856,6 @@ begin
 			begin
 				State := GAME_STATE_OVER;
 				Cows.Count := 0;
-				Alien.Score := 0;
 				continue;
 			end;
 
@@ -860,7 +897,7 @@ begin
 
 		// HUD
 		RenderHealth(Alien.Health);
-		RenderScore(Alien.Score);
+		RenderScore(PChar(Alien.ScoreStr));
 
 		EndDrawing();
 	end;
@@ -868,6 +905,11 @@ begin
 	UnloadFont(Font);
 	UnloadTexture(CowTexture);
 	UnloadTexture(BackgroundTexture);
+	UnloadSound(CowCaptureSound);
+	UnloadSound(CowSpawnSound);
+	UnloadSound(BulletHitSound);
+	UnloadSound(GunshotSound);
 
+	CloseAudioDevice();
 	CloseWindow();
 end.
