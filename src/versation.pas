@@ -429,14 +429,16 @@ const
 	BULLET_SPEED = 1000;
 var
 	Bullet: TEntity;
+	GunVector: TVector2;
+	PosVector: TVector2;
 begin
+	GunVector := Vector2Rotate(UnitVector, G.Rotation * (System.Pi / 180));
+	PosVector := Vector2Scale(GunVector, G.Body.Width);
+
 	Bullet := BulletCreate(
-		G.Body.X,
-		G.Body.Y,
-		Vector2Scale(
-			Vector2Rotate(UnitVector, G.Rotation * (System.Pi / 180)),
-			BULLET_SPEED
-		)
+		PosVector.X + G.Body.X,
+		PosVector.Y + G.Body.Y,
+		Vector2Scale(GunVector, BULLET_SPEED)
 	);
 	EntityArrayAdd(Bullets, Bullet);
 
@@ -474,8 +476,8 @@ end;
 
 procedure FarmerUpdate(var F: TEntity; var Gun: TEntity; var Bullets: TEntityArray; const Alien: TEntity);
 const
-	FARMER_VELOCITY_FACTOR = 1 / 6;
-	GUN_ANGLE_VELOCITY_FACTOR = 1 / 10;
+	FARMER_VELOCITY_FACTOR = 1 / 3;
+	GUN_ANGLE_VELOCITY_FACTOR = 1 / 8;
 	GUN_SHOOT_DELAY = 1.0;
 var
 	AlienGunAngle: Single;
@@ -725,6 +727,7 @@ const
 	TITLE_RAW = 'Versation';
 
 	BACKGROUND_TEXTURE_PATH = 'assets/textures/background.png';
+	//BACKGROUND_TEXTURE_PATH = '../../../Pictures/Live/YZP_0012.jpg';
 	COW_TEXTURE_PATH        = 'assets/textures/cow.png';
 
 	GAME_OVER_SOUND_PATH   = 'assets/audio/game_over.wav';
@@ -735,7 +738,7 @@ const
 
 	FONT_PATH = 'assets/fonts/Ac437_IBM_VGA_8x16.ttf';
 
-	GAME_OVER_SOUND_VOLUME   = 1.0;
+	GAME_OVER_SOUND_VOLUME   = 0.7;
 	GUNSHOT_SOUND_VOLUME     = 1.0;
 	BULLET_HIT_SOUND_VOLUME  = 0.8;
 	COW_SPAWN_SOUND_VOLUMNE  = 0.8;
@@ -846,10 +849,10 @@ begin
 				CowSpawnTimer := 0;
 				CowSpawnDelay /= COW_SPAWN_DELAY_DECREASE_FACTOR;
 
-				if Cows.Count > COWS_AMOUNT * Stage then
+				if Cows.Count = COWS_AMOUNT * Stage then
 				begin
 					State := GAME_STATE_PLAYING;
-				CowSpawnDelay := COW_SPAWN_DELAY_INITIAL;
+					CowSpawnDelay := COW_SPAWN_DELAY_INITIAL;
 				end
 				else
 				begin
